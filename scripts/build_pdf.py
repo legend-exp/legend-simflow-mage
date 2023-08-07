@@ -23,7 +23,6 @@ import json
 import ROOT
 import uproot
 from legendmeta import LegendMetadata
-import time
 
 
 def process_mage_id(mage_id):
