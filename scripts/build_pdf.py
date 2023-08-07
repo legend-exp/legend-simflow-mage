@@ -23,6 +23,7 @@ import json
 import ROOT
 import uproot
 from legendmeta import LegendMetadata
+import time
 
 
 def process_mage_id(mage_id):
@@ -58,103 +59,75 @@ parser.add_argument("input_files", nargs="+", help="evt tier files")
 
 args = parser.parse_args()
 
-meta = LegendMetadata(args.metadata)
-chmap = meta.channelmap("20230323T000000Z")
-
 if not isinstance(args.input_files, list):
     args.input_files = [args.input_files]
 
-with Path(args.config).open() as f:
+# with Path(args.config).open() as f:
+with open(args.config, "r") as f:
     rconfig = json.load(f)
 
-for file_name in args.input_files:
-    # Get the tree from the file
-    file = ROOT.TFile(file_name, "READ")
-    tree = file.Get("simTree")
+meta = LegendMetadata(args.metadata)
+chmap = meta.channelmap(rconfig["timestamp"])
 
-    uniq_mage_ids = list(
-        {mage_id for n in [list(tree.mage_id) for entry in tree] for mage_id in n}
-    )
+for file_name in args.input_files:
+
+    # load in all the data into a pandas dataframe
+    with uproot.open(f"{file_name}:simTree") as pytree:
+        df_data = pytree.arrays(['energy', 'npe_tot', 'mage_id'], library="pd")
+    df = df_data[df_data["energy"] > rconfig['energy_threshold']]
+    subentry_counts = df.index.get_level_values('entry').value_counts()
+    n_primaries = len(df_data)
+
+    uniq_mage_ids = df_data.mage_id.unique()
     mage_names = {
         mage_id: process_mage_id(mage_id)
         for mage_id in uniq_mage_ids
         if process_mage_id(mage_id)
     }
 
-    # Define a dictionary to contain all the histograms to be filled
-    # for each cut and each detector
-    hists = {
-        f"{cut_name}": {
-            _mage_id: ROOT.TH1F(
-                f"{cut_name}_{_mage_names['ch']}",
-                f"{_mage_names['name']} energy deposition",
-                rconfig["hist"]["nbins"],
-                rconfig["hist"]["emin"],
-                rconfig["hist"]["emax"],
-            )
-            for _mage_id, _mage_names in mage_names.items()
-        }
-        for cut_name in rconfig["cuts"]
-    }
-    # Add the grouped dets hists
-    for cut_name in rconfig["cuts"]:
-        for _type in ["bege", "coax", "icpc", "ppc"]:
-            hists[cut_name][f"{_type}"] = ROOT.TH1F(
-                f"{cut_name}_type_{_type}",
-                f"All {_type} energy deposit",
-                rconfig["hist"]["nbins"],
-                rconfig["hist"]["emin"],
-                rconfig["hist"]["emax"],
-            )
-        hists[cut_name]["all"] = ROOT.TH1F(
-            f"{cut_name}_type_all",
-            "All energy deposit",
-            rconfig["hist"]["nbins"],
-            rconfig["hist"]["emin"],
-            rconfig["hist"]["emax"],
-        )
-
-    out_file_name = file_name.split("/")[-1].split(".")[0] + "_pdf" + ".root"
+    out_file_name = file_name.split("/")[-1].split(".")[0].replace("tier_evt", "tier_pdf") + ".root"
     out_file = uproot.recreate(args.output + out_file_name)
+    out_file["number_of_primaries"] = str(n_primaries)
 
-    # Loop over the data ONCE and fill as we go along
-    for entry in tree:
-        # In the real data we have an energy threshold defined in the config
-        energy_list = [
-            val for val in entry.energy if val >= rconfig["energy_threshold"]
-        ]
-        mage_id_list = [
-            val
-            for index, val in enumerate(entry.mage_id)
-            if entry.energy[index] >= rconfig["energy_threshold"]
-        ]
-        npe_tot = entry.npe_tot
-        if len(energy_list) == 0:
-            continue  # Nothing to fill
+    for _cut_name, _cut_string in rconfig["cuts"].items():
+        dir = out_file.mkdir(_cut_name)
+        # Define the grouped hists to be filled and store them in memory
+        cut_hists = {
+            f"{_type}": ROOT.TH1F( 
+                f"{_type}", f"All {_type} energy deposit",
+                rconfig['hist']['nbins'], rconfig['hist']['emin'], rconfig['hist']['emax']
+            ) for _type in ["bege", "coax", "icpc", "ppc"]
+        } 
+        cut_hists['all'] = ROOT.TH1F( 
+            f"all", f"All energy deposit",
+            rconfig['hist']['nbins'], rconfig['hist']['emin'], rconfig['hist']['emax']
+        ) 
 
-        for cut_name, cut_string in rconfig["cuts"].items():
-            # In the config is a lambda function string that returns true or false for each cut
-            # Maybe this is too much but it allows for more cuts possibly
-            exec(cut_string)
-            pass_cut = func(energy_list, mage_id_list, npe_tot)
-            if not bool(pass_cut):
-                continue
+        # We want to cut on multiplicity for all detectors >25keV
+        # Include them in the dataset then apply cuts - then filter them out
+        # Don;t store AC detectors
+        exec(_cut_string)
 
-            for mage_id, energy in zip(mage_id_list, energy_list):
-                energy_kev = energy * 1000
-                mage_dict = process_mage_id(mage_id)
+        for _mage_id, _mage_names in mage_names.items():
 
-                if mage_dict is False:
-                    continue  # not an 'on' detector so we don't fill
-                hists[cut_name][mage_id].Fill(energy_kev)
-                hists[cut_name][chmap[mage_dict["name"]]["type"]].Fill(energy_kev)
-                hists[cut_name]["all"].Fill(energy_kev)
+            if chmap[_mage_names["name"]]["analysis"]["usability"] != 'on': continue
+            hist = ROOT.TH1F(
+                f"ch{_mage_names['ch']}", f"{_mage_names['name']} energy deposition",
+                rconfig['hist']['nbins'], rconfig['hist']['emin'], rconfig['hist']['emax']
+            )
+            df_channel = df_cut[df_cut.mage_id == _mage_id]
 
-    # Create a new root file with the directories
-    for cut_name in rconfig["cuts"]:
-        dir = out_file.mkdir(cut_name)
-        for _key, item in hists[cut_name].items():
-            dir[item.GetName()] = item
+            for energy in df_channel.energy.values:
+                hist.Fill(energy * 1000) # energy in keV
+
+            dir[hist.GetName()] = hist
+            cut_hists[chmap[_mage_names["name"]]["type"]].Add(hist)
+            cut_hists['all'].Add(hist)
+            del hist
+        
+        for _type, _type_hist in cut_hists.items():
+            dir[_type_hist.GetName()] = _type_hist
+            del _type_hist
+        del cut_hists
 
     out_file.close()
-    file.Close()
