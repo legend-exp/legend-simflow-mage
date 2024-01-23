@@ -265,6 +265,8 @@ for file_name in args.input_files:
                     * 1000
                 )  # keV
 
+                if len(_energy_array) == 0:
+                    continue
                 hists[_cut_name][_rawid].FillN(
                     len(_energy_array), _energy_array, np.ones(len(_energy_array))
                 )
@@ -296,6 +298,8 @@ for file_name in args.input_files:
                     np.where(categories == category)[0]
                 ]
 
+            if len(_energy_1_array) == 0:
+                continue
             hists_2d[_cut_name].FillN(
                 len(_energy_1_array),
                 _energy_2_array,
