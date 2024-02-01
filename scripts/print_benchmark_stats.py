@@ -20,7 +20,7 @@ from pathlib import Path
 
 
 def printline(*line):
-    print("{:<50}{:>16}{:>11}{:>23}".format(*line))
+    print("{:<52}{:>16}{:>11}{:>23}".format(*line))
 
 
 printline("simid", "CPU time [ms/ev]", "evts / 1h", "jobs (1h) / 10^8 evts")
@@ -42,7 +42,7 @@ for simd in sorted(bdir.glob("*/*")):
         data["cpu_time"]
         / snakemake.config["benchmark"]["n_primaries"][simd.parent.name]
     )
-    evts_1h = int(60 * 60 / speed) if speed > 0 else "IN PROGRESS"
+    evts_1h = int(60 * 60 / speed) if speed > 0 else "..."
     njobs = int(1e8 / evts_1h) if not isinstance(evts_1h, str) else 0
     printline(
         simd.parent.name + "." + simd.name,
