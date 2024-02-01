@@ -1,12 +1,9 @@
 # profit from Perlmutter's scratch area: https://docs.nersc.gov/filesystems/perlmutter-scratch
 # see: https://snakemake.readthedocs.io/en/stable/project_info/faq.html#how-can-i-make-use-of-node-local-storage-when-running-cluster-jobs
-# NOTE: should actually set this through the command line, since there is a
-# scratch directory for each user and variable expansion does not work here:
-#   $ snakemake --shadow-prefix "$PSCRATCH" [...]
 # NOTE: this only works if paths to input/output files are NOT absolute! you
 # must not use the $_ special variable in config.json in front of paths that
 # should live in the scratch area and just specify a relative path.
-# shadow-prefix: "$PSCRATCH"
+shadow-prefix: $PSCRATCH
 
 # NERSC uses the SLURM job scheduler
 # - https://snakemake.readthedocs.io/en/stable/executing/cluster.html#executing-on-slurm-clusters

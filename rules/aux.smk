@@ -16,8 +16,7 @@
 for tier, simid, _ in simconfigs:
 
     rule:
-        f"""Produces plots for the primary event vertices of simid {simid} in
-        tier {tier}"""
+        f"""Produces plots for the primary event vertices of simid {simid} in tier {tier}"""
         input:
             aggregate.gen_list_of_simid_outputs(config, tier, simid, max_files=5),
         output:
@@ -37,8 +36,7 @@ for tier, simid, _ in simconfigs:
 
 rule print_stats:
     """Prints a table with summary runtime information for each `simid`.
-    No wildcards are used.
-    """
+    No wildcards are used."""
     localrule: True
     script:
         "../scripts/print_simprod_stats.py"
@@ -46,8 +44,7 @@ rule print_stats:
 
 rule print_benchmark_stats:
     """Prints a table with summary runtime information of a benchmarking run.
-    No wildcards are used.
-    """
+    No wildcards are used."""
     localrule: True
     script:
         "../scripts/print_benchmark_stats.py"

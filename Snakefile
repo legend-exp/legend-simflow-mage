@@ -110,9 +110,7 @@ simconfigs = aggregate.collect_simconfigs(config, ["ver", "raw"])
 for tier, simid, n_macros in simconfigs:
 
     rule:
-        f"""Generates all needed simulation macros ({n_macros})
-        for {simid} in tier {tier}. No wildcards are used.
-        """
+        f"""Generates all needed simulation macros ({n_macros}) for {simid} in tier {tier}. No wildcards are used."""
         localrule: True
         input:
             **patterns.macro_gen_inputs(config, tier, simid),

@@ -102,7 +102,7 @@ in great detail. Here's a basic description of its fields:
 - `execenv`: defines the software environment (container) where all jobs
   should be executed (see below).
 
-> **Note**
+> [!TIP]
 > all these configuration parameters can be overridden at runtime through Snakemake's `--config` option.
 
 ## Production
@@ -162,8 +162,7 @@ This can generate a lot of output, consider piping it to a file.
 
 Find some useful Snakemake command-line options at the bottom of this page.
 
-> **Warning**
->
+> [!IMPORTANT]
 > Geant4 macro files are marked as
 > [`ancient`](https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#ignoring-timestamps)
 > as a workaround to the fact that they might have been re-generated (i.e. they have a more recent
@@ -198,7 +197,8 @@ raw.l200a-fiber-support-copper-Co60                   (223s) 44.69      80558   
 ...                                                            ...        ...                    ...
 ```
 
-> **Note** The CPU time is a good measure of the actual simulation time, since other tasks (e.g.
+> [!NOTE]
+> The CPU time is a good measure of the actual simulation time, since other tasks (e.g.
 > application loading) are typically not CPU intensive.
 
 ## NERSC-specific instructions
@@ -216,8 +216,7 @@ used](https://docs.nersc.gov/jobs/workflow/snakemake/#building-an-environment-co
 > mamba activate $SWPREFIX/.conda/snakemake
 ```
 
-> **Note**
->
+> [!IMPORTANT]
 > To make proper use of LEGEND's shifter containers, special permissions must be
 > set on the `input/simprod/config/MaGe` directory **and all its parents** (see
 > [docs](https://docs.nersc.gov/development/shifter/faq-troubleshooting/#invalid-volume-map)):
@@ -243,7 +242,7 @@ Start the production on the batch nodes (via SLURM):
 snakemake --profile workflow/profiles/nersc-batch
 ```
 
-> **Warning**
+> [!WARNING]
 > This profile does not work as expected at the moment, see https://github.com/legend-exp/legend-simflow/issues/8.
 > [This temporary script](https://github.com/legend-exp/legend-simflow/blob/main/profiles/nersc-batch/nersc-submit.sh)
 > can be used instead. Note that the maximum runtime at NERSC is 12 hours, so jobs might be killed.
