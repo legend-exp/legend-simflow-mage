@@ -360,8 +360,8 @@ for _cut_name, _hist_dict in hists.items():
 for dict in [sum_hists, hists_2d]:
     for _cut_name, _hist in dict.items():
         dir = out_file.mkdir(_cut_name)
-        if _hist.GetEntries() > 0:
-            dir["all"] = _hist
+        dir["all"] = _hist
+        
 print("INFO: nprimaries", n_primaries_total)
 out_file["number_of_primaries"] = str(int(n_primaries_total))
 out_file.close()
