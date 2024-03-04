@@ -185,9 +185,6 @@ geds_positions= {
 }
 
 strings = np.sort([item[1] for item in geds_strings.items()])
-string2index = np.vectorize({element: index for index, element in enumerate(strings)}.get)
-channel2string = get_vectorised_converter(geds_strings)
-channel2position = get_vectorised_converter(geds_positions)
 
 n_primaries_total = 0
 
