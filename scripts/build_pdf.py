@@ -149,7 +149,7 @@ parser.add_argument(
 )
 parser.add_argument("--config", "-c", required=True, help="configuration file")
 parser.add_argument("--output", "-o", required=True, help="output file name")
-parser.add_argument("--metadata", "-m", required=True, help="path to legend-metadata")
+parser.add_argument("--metadata", "-m",required=True, help="path to legend-metadata")
 parser.add_argument("input_files", nargs="+", help="evt tier files")
 
 args = parser.parse_args()
@@ -227,13 +227,13 @@ hists_2d={}
 ## categories for m2
 string_diff=np.arange(7)
 floor_diff=np.arange(8)
-names_m2 =[f"sd_{item1}_fd_{item2}" for item1 in string_diff for item2 in floor_diff]
+names_m2 =[f"sd_{item1}" for item1 in string_diff ]
 names_m2.extend(["all","cat_1","cat_2","cat_3"])
 
 for _cut_name in rconfig["cuts"]:
     if rconfig["cuts"][_cut_name]["is_sum"] is True:
         sum_hists[_cut_name]={}
-        sum_hists["all"]= ROOT.TH1F(
+        sum_hists[_cut_name]["all"]= ROOT.TH1F(
                             f"{_cut_name}_all_summed",
                             "summed energy deposits",
                             rconfig["hist"]["nbins"],
@@ -307,12 +307,12 @@ for file_name in args.input_files:
     n_primaries_total += n_primaries
 
     for _cut_name, _cut_dict in rconfig["cuts"].items():
+
         # We want to cut on multiplicity for all detectors >25keV, even AC
         # Include them in the dataset then apply cuts - then filter them out
         # Don't store AC detectors
         _cut_string = _cut_dict["cut_string"]
         df_cut = df_ecut.copy() if _cut_string == "" else df_ecut.query(_cut_string)
-
         df_good = df_cut[df_cut.is_good == True]  # noqa: E712
 
         if _cut_dict["is_sum"] is False and _cut_dict["is_2d"] is False:
@@ -332,23 +332,25 @@ for file_name in args.input_files:
         ### 2d histos
         elif _cut_dict["is_2d"] is True:
             
-            ### loop over categories
-            for name in names_m2:
-                _energy_1_array = (
+            _energy_1_array = (
                     df_good.groupby(df_good.index).energy.max().to_numpy(dtype=float)
                 ) * 1000
-                _energy_2_array = (
+            _energy_2_array = (
                     df_good.groupby(df_good.index).energy.min().to_numpy(dtype=float)
                 ) * 1000
 
-                if name!="all":
-                    _mult_channel_array = (
+            _mult_channel_array = (
                         df_good.groupby(df_good.index)
                         .mage_id.apply(lambda x: x.to_numpy())
                         .to_numpy()
                     )
-                    categories =get_m2_categories(_mult_channel_array,channel2string,channel2position)
-                    string_diff,floor_diff =get_string_row_diff(_mult_channel_array,channel2string,channel2position)
+            ### loop over categories
+            for name in names_m2:
+                
+                if name!="all":
+                   
+                    categories =get_m2_categories(_mult_channel_array,channel_to_string,channel_to_position)
+                    string_diff,floor_diff =get_string_row_diff(_mult_channel_array,channel_to_string,channel_to_position)
                     
                     if ("cat" in name):
                         cat=int(name.split("_")[1])
@@ -357,17 +359,16 @@ for file_name in args.input_files:
                         
                     elif ("sd" in name):
                         sd=int(name.split("_")[1])
-                        fd=int(name.split("_")[3])
                         
-                        ids =np.where((string_diff==sd) & (floor_diff==fd))[0]
+                        ids =np.where((string_diff==sd))[0]
                         _energy_1_array_tmp=np.array(_energy_1_array)[ids]
                         _energy_2_array_tmp=np.array(_energy_2_array)[ids]
 
                 else:
-                    _energy_1_array_tmp=np.array(_energy_1_array_tmp)
-                    _energy_2_array_tmp=np.array(_energy_2_array_tmp)
+                    _energy_1_array_tmp=np.array(_energy_1_array)
+                    _energy_2_array_tmp=np.array(_energy_2_array)
 
-                if len(_energy_1_array) == 0:
+                if len(_energy_1_array_tmp) == 0:
                     continue
                 hists_2d[_cut_name][name].FillN(
                     len(_energy_1_array_tmp),
@@ -384,7 +385,7 @@ for file_name in args.input_files:
             if len(_summed_energy_array) == 0:
                 continue
 
-            sum_hists[_cut_name].FillN(
+            sum_hists[_cut_name]["all"].FillN(
                 len(_summed_energy_array),
                 _summed_energy_array,
                 np.ones(len(_summed_energy_array)),
