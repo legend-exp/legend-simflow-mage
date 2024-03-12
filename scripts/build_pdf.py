@@ -277,7 +277,7 @@ for _cut_name in rconfig["cuts"]:
             rconfig["hist"]["emax"],
             rconfig["hist"]["nbins"],
             rconfig["hist"]["emin"],
-            rconfig["hist"]["emax"],
+            rconfig["hist"]["emax"]
             )
     
 for file_name in args.input_files:
