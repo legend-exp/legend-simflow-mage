@@ -128,6 +128,34 @@ def main():
         position_one=channel2position(channel_one)
         position_two=channel2position(channel_two)
 
+def get_string_row_diff(channel_array, channel2string, channel2position):
+    """
+    Get the categories for the m2 data based on 3 categories (should be in the cfg)
+    1) Same string vertical neighbour
+    2) Same string not vertical neighbor
+    3) Different string
+    Parameters:
+        channel_array: 2D numpy array of channels
+        channel2string: vectorised numpy function to convert channel into string
+        chnanel2position: vectorised numpy function to convert channel into position
+    Returns:
+        categories: list of categories per event
+    """
+
+    channel_array = np.vstack(channel_array)
+    channel_one = channel_array[:, 0].T
+    channel_two = channel_array[:, 1].T
+
+    ## convert to the list of strings
+    string_one = channel2string(channel_one)
+    string_two = channel2string(channel_two)
+    string_diff_1 = (string_one - string_two) % 11
+    string_diff_2 = (-string_one + string_two) % 11
+    string_diff = np.array([min(a, b) for a, b in zip(string_diff_1, string_diff_2)])
+
+    position_one = channel2position(channel_one)
+    position_two = channel2position(channel_two)
+
         floor_diff = np.abs(position_one-position_two)
 
         return np.array(string_diff),np.array(floor_diff)
@@ -388,6 +416,20 @@ def main():
                 _energy_2_array = (
                         df_good.groupby(df_good.index).energy.min().to_numpy(dtype=float)
                     ) * 1000
+                if len(_energy_array) == 0:
+                    continue
+                hists[_cut_name][_rawid].FillN(
+                    len(_energy_array), _energy_array, np.ones(len(_energy_array))
+                )
+
+        ### 2d histos
+        elif _cut_dict["is_2d"] is True:
+            _energy_1_array = (
+                df_good.groupby(df_good.index).energy.max().to_numpy(dtype=float)
+            ) * 1000
+            _energy_2_array = (
+                df_good.groupby(df_good.index).energy.min().to_numpy(dtype=float)
+            ) * 1000
 
                 _mult_channel_array = (
                             df_good.groupby(df_good.index)
