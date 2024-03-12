@@ -160,7 +160,7 @@ parser.add_argument(
 )
 parser.add_argument("--config", "-c", required=True, help="configuration file")
 parser.add_argument("--output", "-o", required=True, help="output file name")
-parser.add_argument("--metadata", "-m",required=False, help="path to legend-metadata")
+parser.add_argument("--metadata", "-m",required=True, help="path to legend-metadata")
 parser.add_argument("input_files", nargs="+", help="evt tier files")
 
 args = parser.parse_args()
@@ -171,7 +171,7 @@ if not isinstance(args.input_files, list):
 with Path(args.config).open() as f:
     rconfig = json.load(f)
 
-meta = LegendMetadata() #rgs.metadata)
+meta = LegendMetadata(args.metadata)
 chmap = meta.channelmap(rconfig["timestamp"])
 # We don't have a list of mage_ids so these need to be instantiated and checked
 # in the loop of sim data
