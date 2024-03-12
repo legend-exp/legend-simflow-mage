@@ -477,8 +477,8 @@ out_file = uproot.recreate(args.output)
 for _cut_name, _hist_dict in hists.items():
     dir = out_file.mkdir(_cut_name)
     for key, item in _hist_dict.items():
-        if item.GetEntries() > 0:
-            dir[key] = item
+       
+        dir[key] = item
 
 ## fill run based histos
 for _cut_name, _hist_dict in run_hists.items():
