@@ -16,9 +16,10 @@
 # ruff: noqa: F821, T201
 
 from __future__ import annotations
-import re
+
 import argparse
 import json
+import re
 from pathlib import Path
 
 import numpy as np
@@ -26,7 +27,6 @@ import pandas as pd
 import ROOT
 import uproot
 from legendmeta import LegendMetadata
-import sys
 
 
 def process_mage_id(mage_ids):
@@ -53,15 +53,18 @@ def process_mage_id(mage_ids):
 
     return mage_names
 
+
 def get_run(text):
-    pattern = re.compile(r'r\d\d\d')
+    pattern = re.compile(r"r\d\d\d")
     matches = re.findall(pattern, text)
     return matches
 
+
 def get_period(text):
-    pattern = re.compile(r'p\d\d')
+    pattern = re.compile(r"p\d\d")
     matches = re.findall(pattern, text)
     return matches
+
 
 def get_m2_categories(channel_array, channel_to_string, channel_to_position):
     """
@@ -147,7 +150,6 @@ def get_vectorised_converter(mapping):
     return np.vectorize(channel_to_other)
 
 
-
 parser = argparse.ArgumentParser(
     prog="build_pdf", description="build LEGEND pdf files from evt tier files"
 )
@@ -203,7 +205,7 @@ n_primaries_total = 0
 print("INFO: computing number of simulated primaries from raw files")
 if args.raw_files:
     for file in args.raw_files:
-        with uproot.open(f"{file}:fTree",object_cache=None) as fTree:
+        with uproot.open(f"{file}:fTree", object_cache=None) as fTree:
             n_primaries_total += fTree["fNEvents"].array(entry_stop=1)[0]
 print("INFO: nprimaries", n_primaries_total)
 
@@ -228,20 +230,21 @@ hists = {
     and rconfig["cuts"][_cut_name]["is_2d"] is False
 }
 
-runs=meta.dataprod.config.analysis_runs
-run_hists={}
+runs = meta.dataprod.config.analysis_runs
+run_hists = {}
 for _cut_name in rconfig["cuts"]:
     if not rconfig["cuts"][_cut_name]["is_sum"]:
         run_hists[_cut_name] = {}
-        for _period, _run_list in (runs.items()):
-            
+        for _period, _run_list in runs.items():
             for run in _run_list:
                 hist_name = f"{_cut_name}_{_period}_{run}"
                 hist_title = f"{_period} {run} energy deposits"
                 nbins = rconfig["hist"]["nbins"]
                 emin = rconfig["hist"]["emin"]
                 emax = rconfig["hist"]["emax"]
-                run_hists[_cut_name][f"{_period}_{run}"] = ROOT.TH1F(hist_name, hist_title, nbins, emin, emax)
+                run_hists[_cut_name][f"{_period}_{run}"] = ROOT.TH1F(
+                    hist_name, hist_title, nbins, emin, emax
+                )
 
 
 # When we want to start summing the energy of events we have to treat them differently
@@ -286,18 +289,18 @@ for file_name in args.input_files:
     ## get the run and period
     file_end = file_name.split("/")[-1]
 
-    run= get_run(file_end)
-    period=get_period(file_end)
-    if (len(run)!=1):
+    run = get_run(file_end)
+    period = get_period(file_end)
+    if len(run) != 1:
         raise ValueError("Error filename doesnt contain a unique pattern rXYZ")
-    if (len(period)!=1):
+    if len(period) != 1:
         raise ValueError("Error filename doesnt contain a unique pattern pXY")
 
-    period=period[0]
-    run=run[0]
+    period = period[0]
+    run = run[0]
 
     ### now open the file
-    with uproot.open(f"{file_name}:simTree",object_cache=None) as pytree:
+    with uproot.open(f"{file_name}:simTree", object_cache=None) as pytree:
         if pytree.num_entries == 0:
             msg = f"ERROR: MPP evt file {file_name} has 0 events in simTree"
             raise RuntimeError(msg)
@@ -362,19 +365,17 @@ for file_name in args.input_files:
                     len(_energy_array), _energy_array, np.ones(len(_energy_array))
                 )
 
-
             ### fill also time dependent hists
-            _energy_array_tot = (
-                    df_good.energy.to_numpy(dtype=float)
-                    * 1000
-                )
+            _energy_array_tot = df_good.energy.to_numpy(dtype=float) * 1000
 
-            if len(_energy_array_tot) == 0: 
+            if len(_energy_array_tot) == 0:
                 continue
             run_hists[_cut_name][f"{period}_{run}"].FillN(
-                        len(_energy_array_tot), _energy_array_tot, np.ones(len(_energy_array_tot))
-                    )
-            
+                len(_energy_array_tot),
+                _energy_array_tot,
+                np.ones(len(_energy_array_tot)),
+            )
+
         ### 2d histos
         elif _cut_dict["is_2d"] is True:
             _energy_1_array = (
@@ -391,7 +392,6 @@ for file_name in args.input_files:
             )
             ### loop over categories
             for name in names_m2:
-
                 if name != "all":
                     categories = get_m2_categories(
                         _mult_channel_array, channel_to_string, channel_to_position
@@ -415,7 +415,6 @@ for file_name in args.input_files:
                         ids = np.where(string_diff == sd)[0]
                         _energy_1_array_tmp = np.array(_energy_1_array)[ids]
                         _energy_2_array_tmp = np.array(_energy_2_array)[ids]
-
 
                 else:
                     _energy_1_array_tmp = np.array(_energy_1_array)
@@ -478,13 +477,12 @@ out_file = uproot.recreate(args.output)
 for _cut_name, _hist_dict in hists.items():
     dir = out_file.mkdir(_cut_name)
     for key, item in _hist_dict.items():
-       
         dir[key] = item
 
 ## fill run based histos
 for _cut_name, _hist_dict in run_hists.items():
     for key, item in _hist_dict.items():
-        out_file[_cut_name+"/"+key] = item
+        out_file[_cut_name + "/" + key] = item
 
 # All other hists
 for dict in [sum_hists, hists_2d]:
@@ -497,5 +495,3 @@ for dict in [sum_hists, hists_2d]:
 print("INFO: nprimaries", n_primaries_total)
 out_file["number_of_primaries"] = str(int(n_primaries_total))
 out_file.close()
-
-
