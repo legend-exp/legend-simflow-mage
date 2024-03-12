@@ -272,8 +272,12 @@ for _cut_name in rconfig["cuts"]:
             hists_2d[_cut_name][cat]=ROOT.TH2F(
             f"{_cut_name}_{cat}_2d",
             "energy deposits",
-            3000,0,3000,
-            3000,0,3000,
+            rconfig["hist"]["nbins"],
+            rconfig["hist"]["emin"],
+            rconfig["hist"]["emax"],
+            rconfig["hist"]["nbins"],
+            rconfig["hist"]["emin"],
+            rconfig["hist"]["emax"],
             )
     
 for file_name in args.input_files:
