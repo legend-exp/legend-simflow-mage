@@ -375,7 +375,7 @@ def main():
 
                 if len(_energy_array_tot) == 0: 
                     continue
-                    run_hists[_cut_name][f"{_period}_{run}"].FillN(
+                run_hists[_cut_name][f"{period}_{run}"].FillN(
                             len(_energy_array_tot), _energy_array_tot, np.ones(len(_energy_array_tot))
                         )
                 
@@ -481,6 +481,7 @@ def main():
     ## fill run based histos
     for _cut_name, _hist_dict in run_hists.items():
         for key, item in _hist_dict.items():
+            print(f"Saving {_cut_name}, {key}")
             out_file[_cut_name+"/"+key] = item
     
     # All other hists
