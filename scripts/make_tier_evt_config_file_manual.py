@@ -26,14 +26,16 @@ from pathlib import Path
 
 from legendmeta import JsonDB, LegendMetadata
 
-prod_dir = "/data2/public/prodenv/prod-blind/ref/v02.00"
+prod_dir = "/data2/public/prodenv/prod-blind/ref-v1.0.0"
 lmeta = LegendMetadata(f"{prod_dir}/inputs")
 
 runlist = (
     [f"l200-p03-r00{r}-phy" for r in range(6)]
     + [f"l200-p04-r00{r}-phy" for r in range(4)]
-    + [f"l200-p06-r00{r}-phy" for r in range(7)]
-    + [f"l200-p07-r00{r}-phy" for r in range(1, 7)]
+    + [f"l200-p06-r00{r}-phy" for r in range(6)]
+    + [f"l200-p07-r00{r}-phy" for r in range(1, 8)]
+    + [f"l200-p08-r00{r}-phy" for r in range(5)]
+    + [f"l200-p08-r00{r}-phy" for r in range(6, 10)]
 )
 
 # use FCCD values reviewed by Elisabetta
@@ -49,7 +51,7 @@ for run in runlist:
     # get parameters and hardware configuration for run
     p = run.split("-")
     tstamp = lmeta.dataprod.runinfo[p[1]][p[2]][p[3]].start_key
-    chmap = lmeta.channelmap(tstamp).map("system", unique=False).geds
+    chmap = lmeta.channelmap(tstamp).group("system").geds
     hit_pars = par_pht_meta.on(tstamp)
 
     # now loop over all HPGe channels

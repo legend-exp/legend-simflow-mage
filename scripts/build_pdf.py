@@ -16,9 +16,10 @@
 # ruff: noqa: F821, T201
 
 from __future__ import annotations
-import re
+
 import argparse
 import json
+import re
 from pathlib import Path
 
 import numpy as np
@@ -26,7 +27,6 @@ import pandas as pd
 import ROOT
 import uproot
 from legendmeta import LegendMetadata
-import sys
 
 
 def process_mage_id(mage_ids):
@@ -53,14 +53,17 @@ def process_mage_id(mage_ids):
 
     return mage_names
 
+
 def get_run(text):
     pattern = re.compile(r'r\d\d\d')
     return re.findall(pattern, text)
+
 
 def get_period(text):
     pattern = re.compile(r'p\d\d')
     return re.findall(pattern, text)
     
+
 
 def get_m2_categories(channel_array, channel_to_string, channel_to_position):
     """
@@ -96,7 +99,8 @@ def get_m2_categories(channel_array, channel_to_string, channel_to_position):
     category = 1 * is_cat_one + 2 * is_cat_two + 3 * is_cat_three
     return np.array(category)
 
-def get_string_row_diff(channel_array,channel2string,channel2position):
+
+def get_string_row_diff(channel_array, channel2string, channel2position):
     """
     Get the categories for the m2 data based on 3 categories (should be in the cfg)
     1) Same string vertical neighbour
@@ -109,25 +113,24 @@ def get_string_row_diff(channel_array,channel2string,channel2position):
     Returns:
         categories: list of categories per event
     """
-    
-    channel_array=np.vstack(channel_array)
-    channel_one = channel_array[:,0].T
-    channel_two=channel_array[:,1].T
-    
-    
+
+    channel_array = np.vstack(channel_array)
+    channel_one = channel_array[:, 0].T
+    channel_two = channel_array[:, 1].T
+
     ## convert to the list of strings
-    string_one=channel2string(channel_one)
-    string_two=channel2string(channel_two)
-    string_diff_1= (string_one-string_two)%11
-    string_diff_2= (-string_one+string_two)%11
+    string_one = channel2string(channel_one)
+    string_two = channel2string(channel_two)
+    string_diff_1 = (string_one - string_two) % 11
+    string_diff_2 = (-string_one + string_two) % 11
     string_diff = np.array([min(a, b) for a, b in zip(string_diff_1, string_diff_2)])
 
-    position_one=channel2position(channel_one)
-    position_two=channel2position(channel_two)
+    position_one = channel2position(channel_one)
+    position_two = channel2position(channel_two)
 
-    floor_diff = np.abs(position_one-position_two)
+    floor_diff = np.abs(position_one - position_two)
 
-    return np.array(string_diff),np.array(floor_diff)
+    return np.array(string_diff), np.array(floor_diff)
 
 
 def get_vectorised_converter(mapping):
@@ -146,7 +149,6 @@ def get_vectorised_converter(mapping):
     return np.vectorize(channel_to_other)
 
 
-
 parser = argparse.ArgumentParser(
     prog="build_pdf", description="build LEGEND pdf files from evt tier files"
 )
@@ -159,7 +161,7 @@ parser.add_argument(
 )
 parser.add_argument("--config", "-c", required=True, help="configuration file")
 parser.add_argument("--output", "-o", required=True, help="output file name")
-parser.add_argument("--metadata", "-m",required=True, help="path to legend-metadata")
+parser.add_argument("--metadata", "-m", required=True, help="path to legend-metadata")
 parser.add_argument("input_files", nargs="+", help="evt tier files")
 
 args = parser.parse_args()
@@ -183,12 +185,12 @@ geds_mapping = {
     for _name, _dict in chmap.items()
     if chmap[_name]["system"] == "geds"
 }
-geds_strings= {
+geds_strings = {
     f"ch{_dict['daq']['rawid']}": _dict["location"]["string"]
     for _name, _dict in chmap.items()
     if chmap[_name]["system"] == "geds"
 }
-geds_positions= {
+geds_positions = {
     f"ch{_dict['daq']['rawid']}": _dict["location"]["position"]
     for _name, _dict in chmap.items()
     if chmap[_name]["system"] == "geds"
@@ -202,7 +204,7 @@ n_primaries_total = 0
 print("INFO: computing number of simulated primaries from raw files")
 if args.raw_files:
     for file in args.raw_files:
-        with uproot.open(f"{file}:fTree",object_cache=None) as fTree:
+        with uproot.open(f"{file}:fTree", object_cache=None) as fTree:
             n_primaries_total += fTree["fNEvents"].array(entry_stop=1)[0]
 print("INFO: nprimaries", n_primaries_total)
 
@@ -227,58 +229,59 @@ hists = {
     and rconfig["cuts"][_cut_name]["is_2d"] is False
 }
 
-runs=meta.dataprod.config.analysis_runs
-run_hists={}
+runs = meta.dataprod.config.analysis_runs
+run_hists = {}
 for _cut_name in rconfig["cuts"]:
     if not rconfig["cuts"][_cut_name]["is_sum"]:
         run_hists[_cut_name] = {}
-        for _period, _run_list in (runs.items()):
-            
+        for _period, _run_list in runs.items():
             for run in _run_list:
                 hist_name = f"{_cut_name}_{_period}_{run}"
                 hist_title = f"{_period} {run} energy deposits"
                 nbins = rconfig["hist"]["nbins"]
                 emin = rconfig["hist"]["emin"]
                 emax = rconfig["hist"]["emax"]
-                run_hists[_cut_name][f"{_period}_{run}"] = ROOT.TH1F(hist_name, hist_title, nbins, emin, emax)
+                run_hists[_cut_name][f"{_period}_{run}"] = ROOT.TH1F(
+                    hist_name, hist_title, nbins, emin, emax
+                )
 
 
 # When we want to start summing the energy of events we have to treat them differently
 
-sum_hists={}
-hists_2d={}
+sum_hists = {}
+hists_2d = {}
 
 ## categories for m2
-string_diff=np.arange(7)
-floor_diff=np.arange(8)
-names_m2 =[f"sd_{item1}" for item1 in string_diff ]
-names_m2.extend(["all","cat_1","cat_2","cat_3"])
+string_diff = np.arange(7)
+floor_diff = np.arange(8)
+names_m2 = [f"sd_{item1}" for item1 in string_diff]
+names_m2.extend(["all", "cat_1", "cat_2", "cat_3"])
 
 for _cut_name in rconfig["cuts"]:
     if rconfig["cuts"][_cut_name]["is_sum"] is True:
-        sum_hists[_cut_name]={}
-        sum_hists[_cut_name]["all"]= ROOT.TH1F(
-                            f"{_cut_name}_all_summed",
-                            "summed energy deposits",
-                            rconfig["hist"]["nbins"],
-                            rconfig["hist"]["emin"],
-                            rconfig["hist"]["emax"],
-                    )
-    if rconfig["cuts"][_cut_name]["is_2d"] is True:
-        hists_2d[_cut_name]={}
-        
-        for cat in names_m2:
-            hists_2d[_cut_name][cat]=ROOT.TH2F(
-            f"{_cut_name}_{cat}_2d",
-            "energy deposits",
+        sum_hists[_cut_name] = {}
+        sum_hists[_cut_name]["all"] = ROOT.TH1F(
+            f"{_cut_name}_all_summed",
+            "summed energy deposits",
             rconfig["hist"]["nbins"],
             rconfig["hist"]["emin"],
             rconfig["hist"]["emax"],
-            rconfig["hist"]["nbins"],
-            rconfig["hist"]["emin"],
-            rconfig["hist"]["emax"]
+        )
+    if rconfig["cuts"][_cut_name]["is_2d"] is True:
+        hists_2d[_cut_name] = {}
+
+        for cat in names_m2:
+            hists_2d[_cut_name][cat] = ROOT.TH2F(
+                f"{_cut_name}_{cat}_2d",
+                "energy deposits",
+                rconfig["hist"]["nbins"],
+                rconfig["hist"]["emin"],
+                rconfig["hist"]["emax"],
+                rconfig["hist"]["nbins"],
+                rconfig["hist"]["emin"],
+                rconfig["hist"]["emax"],
             )
-    
+
 for file_name in args.input_files:
     print("INFO: loading file", file_name)
 
@@ -294,11 +297,11 @@ for file_name in args.input_files:
         err ="Error filename doesn't contain a unique pattern pXY"
         raise ValueError(err)
 
-    period=period[0]
-    run=run[0]
+    period = period[0]
+    run = run[0]
 
     ### now open the file
-    with uproot.open(f"{file_name}:simTree",object_cache=None) as pytree:
+    with uproot.open(f"{file_name}:simTree", object_cache=None) as pytree:
         if pytree.num_entries == 0:
             msg = f"ERROR: MPP evt file {file_name} has 0 events in simTree"
             raise RuntimeError(msg)
@@ -316,11 +319,9 @@ for file_name in args.input_files:
     rng = np.random.default_rng()
     df_data["npe_tot_poisson"] = rng.poisson(df_data.npe_tot)
 
-
     # Data has awkward length lists per event
     # exploding gives a dataframe with multiple rows per event (event no. is the index)
     df_exploded = df_data.explode(["energy", "mage_id", "is_good"])
-
 
     # Doing this over and over again maybe slow
     chmap_mage = process_mage_id(
@@ -329,15 +330,12 @@ for file_name in args.input_files:
     channel_to_string = get_vectorised_converter(chmap_mage["string"])
     channel_to_position = get_vectorised_converter(chmap_mage["position"])
 
-
     # Apply the real energy cut for effetcive event reconstruction
     df_ecut = df_exploded.query(f"energy > {rconfig['energy_threshold']}")
-
 
     # These give you the multiplicity of events (and events not including AC detectors)
     index_counts = df_ecut.index.value_counts()
     index_counts_is_good = df_ecut.query("is_good == True").index.value_counts()
-
 
     # Add columns for configuration file cuts (NOTE: quite slow)
     df_ecut = df_ecut.copy()
@@ -347,7 +345,6 @@ for file_name in args.input_files:
     n_primaries_total += n_primaries
 
     for _cut_name, _cut_dict in rconfig["cuts"].items():
-
         # We want to cut on multiplicity for all detectors >25keV, even AC
         # Include them in the dataset then apply cuts - then filter them out
         # Don't store AC detectors
@@ -369,57 +366,60 @@ for file_name in args.input_files:
                     len(_energy_array), _energy_array, np.ones(len(_energy_array))
                 )
 
-
             ### fill also time dependent hists
-            _energy_array_tot = (
-                    df_good.energy.to_numpy(dtype=float)
-                    * 1000
-                )
+            _energy_array_tot = df_good.energy.to_numpy(dtype=float) * 1000
 
-            if len(_energy_array_tot) == 0: 
+            if len(_energy_array_tot) == 0:
                 continue
             run_hists[_cut_name][f"{period}_{run}"].FillN(
-                        len(_energy_array_tot), _energy_array_tot, np.ones(len(_energy_array_tot))
-                    )
-            
+                len(_energy_array_tot),
+                _energy_array_tot,
+                np.ones(len(_energy_array_tot)),
+            )
+
         ### 2d histos
         elif _cut_dict["is_2d"] is True:
-            
             _energy_1_array = (
-                    df_good.groupby(df_good.index).energy.max().to_numpy(dtype=float)
-                ) * 1000
+                df_good.groupby(df_good.index).energy.max().to_numpy(dtype=float)
+            ) * 1000
             _energy_2_array = (
-                    df_good.groupby(df_good.index).energy.min().to_numpy(dtype=float)
-                ) * 1000
+                df_good.groupby(df_good.index).energy.min().to_numpy(dtype=float)
+            ) * 1000
 
             _mult_channel_array = (
-                        df_good.groupby(df_good.index)
-                        .mage_id.apply(lambda x: x.to_numpy())
-                        .to_numpy()
-                    )
+                df_good.groupby(df_good.index)
+                .mage_id.apply(lambda x: x.to_numpy())
+                .to_numpy()
+            )
             ### loop over categories
             for name in names_m2:
-                
-                if name!="all":
-                
-                    categories =get_m2_categories(_mult_channel_array,channel_to_string,channel_to_position)
-                    string_diff,floor_diff =get_string_row_diff(_mult_channel_array,channel_to_string,channel_to_position)
-                    
-                    if ("cat" in name):
-                        cat=int(name.split("_")[1])
-                        _energy_1_array_tmp=np.array(_energy_1_array)[np.where(categories==cat)[0]]
-                        _energy_2_array_tmp=np.array(_energy_2_array)[np.where(categories==cat)[0]]
-                        
-                    elif ("sd" in name):
-                        sd=int(name.split("_")[1])
-                        
-                        ids =np.where((string_diff==sd))[0]
-                        _energy_1_array_tmp=np.array(_energy_1_array)[ids]
-                        _energy_2_array_tmp=np.array(_energy_2_array)[ids]
+                if name != "all":
+                    categories = get_m2_categories(
+                        _mult_channel_array, channel_to_string, channel_to_position
+                    )
+                    string_diff, floor_diff = get_string_row_diff(
+                        _mult_channel_array, channel_to_string, channel_to_position
+                    )
+
+                    if "cat" in name:
+                        cat = int(name.split("_")[1])
+                        _energy_1_array_tmp = np.array(_energy_1_array)[
+                            np.where(categories == cat)[0]
+                        ]
+                        _energy_2_array_tmp = np.array(_energy_2_array)[
+                            np.where(categories == cat)[0]
+                        ]
+
+                    elif "sd" in name:
+                        sd = int(name.split("_")[1])
+
+                        ids = np.where(string_diff == sd)[0]
+                        _energy_1_array_tmp = np.array(_energy_1_array)[ids]
+                        _energy_2_array_tmp = np.array(_energy_2_array)[ids]
 
                 else:
-                    _energy_1_array_tmp=np.array(_energy_1_array)
-                    _energy_2_array_tmp=np.array(_energy_2_array)
+                    _energy_1_array_tmp = np.array(_energy_1_array)
+                    _energy_2_array_tmp = np.array(_energy_2_array)
 
                 if len(_energy_1_array_tmp) == 0:
                     continue
@@ -478,24 +478,21 @@ out_file = uproot.recreate(args.output)
 for _cut_name, _hist_dict in hists.items():
     dir = out_file.mkdir(_cut_name)
     for key, item in _hist_dict.items():
-       
         dir[key] = item
 
 ## fill run based histos
 for _cut_name, _hist_dict in run_hists.items():
     for key, item in _hist_dict.items():
-        out_file[_cut_name+"/"+key] = item
+        out_file[_cut_name + "/" + key] = item
 
 # All other hists
 for dict in [sum_hists, hists_2d]:
     for _cut_name, _sub_dirs in dict.items():
         dir = out_file.mkdir(_cut_name)
 
-        for _sub_dir,_hist in _sub_dirs.items():
+        for _sub_dir, _hist in _sub_dirs.items():
             dir[_sub_dir] = _hist
 
 print("INFO: nprimaries", n_primaries_total)
 out_file["number_of_primaries"] = str(int(n_primaries_total))
 out_file.close()
-
-
