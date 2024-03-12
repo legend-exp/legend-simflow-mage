@@ -55,14 +55,13 @@ def process_mage_id(mage_ids):
 
 
 def get_run(text):
-    pattern = re.compile(r'r\d\d\d')
+    pattern = re.compile(r"r\d\d\d")
     return re.findall(pattern, text)
 
 
 def get_period(text):
-    pattern = re.compile(r'p\d\d')
+    pattern = re.compile(r"p\d\d")
     return re.findall(pattern, text)
-    
 
 
 def get_m2_categories(channel_array, channel_to_string, channel_to_position):
@@ -288,13 +287,13 @@ for file_name in args.input_files:
     ## get the run and period
     file_end = file_name.split("/")[-1]
 
-    run= get_run(file_end)
-    period=get_period(file_end)
-    if (len(run)!=1):
-        err ="Error filename doesn't contain a unique pattern rXYZ"
+    run = get_run(file_end)
+    period = get_period(file_end)
+    if len(run) != 1:
+        err = "Error filename doesn't contain a unique pattern rXYZ"
         raise ValueError(err)
-    if (len(period)!=1):
-        err ="Error filename doesn't contain a unique pattern pXY"
+    if len(period) != 1:
+        err = "Error filename doesn't contain a unique pattern pXY"
         raise ValueError(err)
 
     period = period[0]
