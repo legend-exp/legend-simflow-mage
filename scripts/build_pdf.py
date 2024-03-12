@@ -479,7 +479,6 @@ for _cut_name, _hist_dict in hists.items():
 ## fill run based histos
 for _cut_name, _hist_dict in run_hists.items():
     for key, item in _hist_dict.items():
-        print(f"Saving {_cut_name}, {key}")
         out_file[_cut_name+"/"+key] = item
 
 # All other hists
