@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 
 import numpy as np
@@ -51,6 +52,16 @@ def process_mage_id(mage_ids):
                     mage_names["position"][_mage_id] = int(pos)
 
     return mage_names
+
+
+def get_run(text):
+    pattern = re.compile(r"r\d\d\d")
+    return re.findall(pattern, text)
+
+
+def get_period(text):
+    pattern = re.compile(r"p\d\d")
+    return re.findall(pattern, text)
 
 
 def get_m2_categories(channel_array, channel_to_string, channel_to_position):
@@ -124,9 +135,9 @@ def get_string_row_diff(channel_array, channel2string, channel2position):
 def get_vectorised_converter(mapping):
     """Create a vectorized function converting channel to some other quantity based on a dict
     Parameters:
-         - mapping: a python dictionary of the mapping
+        - mapping: a python dictionary of the mapping
     Return:
-         - a numpy vectorised function of this mapping
+        - a numpy vectorised function of this mapping
     """
 
     def channel_to_other(mage_id):
@@ -192,13 +203,14 @@ n_primaries_total = 0
 print("INFO: computing number of simulated primaries from raw files")
 if args.raw_files:
     for file in args.raw_files:
-        with uproot.open(f"{file}:fTree") as fTree:
+        with uproot.open(f"{file}:fTree", object_cache=None) as fTree:
             n_primaries_total += fTree["fNEvents"].array(entry_stop=1)[0]
 print("INFO: nprimaries", n_primaries_total)
 
 # So there are many input files fed into one pdf file
 # set up the hists to fill as we go along
 # Creat a hist for all dets (even AC ones)
+
 print("INFO: initializing histograms")
 hists = {
     _cut_name: {
@@ -215,6 +227,23 @@ hists = {
     if rconfig["cuts"][_cut_name]["is_sum"] is False
     and rconfig["cuts"][_cut_name]["is_2d"] is False
 }
+
+runs = meta.dataprod.config.analysis_runs
+run_hists = {}
+for _cut_name in rconfig["cuts"]:
+    if not rconfig["cuts"][_cut_name]["is_sum"]:
+        run_hists[_cut_name] = {}
+        for _period, _run_list in runs.items():
+            for run in _run_list:
+                hist_name = f"{_cut_name}_{_period}_{run}"
+                hist_title = f"{_period} {run} energy deposits"
+                nbins = rconfig["hist"]["nbins"]
+                emin = rconfig["hist"]["emin"]
+                emax = rconfig["hist"]["emax"]
+                run_hists[_cut_name][f"{_period}_{run}"] = ROOT.TH1F(
+                    hist_name, hist_title, nbins, emin, emax
+                )
+
 
 # When we want to start summing the energy of events we have to treat them differently
 
@@ -255,7 +284,23 @@ for _cut_name in rconfig["cuts"]:
 for file_name in args.input_files:
     print("INFO: loading file", file_name)
 
-    with uproot.open(f"{file_name}:simTree") as pytree:
+    ## get the run and period
+    file_end = file_name.split("/")[-1]
+
+    run = get_run(file_end)
+    period = get_period(file_end)
+    if len(run) != 1:
+        err = "Error filename doesn't contain a unique pattern rXYZ"
+        raise ValueError(err)
+    if len(period) != 1:
+        err = "Error filename doesn't contain a unique pattern pXY"
+        raise ValueError(err)
+
+    period = period[0]
+    run = run[0]
+
+    ### now open the file
+    with uproot.open(f"{file_name}:simTree", object_cache=None) as pytree:
         if pytree.num_entries == 0:
             msg = f"ERROR: MPP evt file {file_name} has 0 events in simTree"
             raise RuntimeError(msg)
@@ -319,6 +364,17 @@ for file_name in args.input_files:
                 hists[_cut_name][_rawid].FillN(
                     len(_energy_array), _energy_array, np.ones(len(_energy_array))
                 )
+
+            ### fill also time dependent hists
+            _energy_array_tot = df_good.energy.to_numpy(dtype=float) * 1000
+
+            if len(_energy_array_tot) == 0:
+                continue
+            run_hists[_cut_name][f"{period}_{run}"].FillN(
+                len(_energy_array_tot),
+                _energy_array_tot,
+                np.ones(len(_energy_array_tot)),
+            )
 
         ### 2d histos
         elif _cut_dict["is_2d"] is True:
@@ -413,6 +469,7 @@ for _cut_name in hists:
         )
         hists[_cut_name]["all"].Add(hists[_cut_name][_rawid])
 
+
 # write the hists to file (but only if they have none zero entries)
 # Changes the names to drop type_ etc
 print("INFO: writing to file", args.output)
@@ -420,8 +477,12 @@ out_file = uproot.recreate(args.output)
 for _cut_name, _hist_dict in hists.items():
     dir = out_file.mkdir(_cut_name)
     for key, item in _hist_dict.items():
-        if item.GetEntries() > 0:
-            dir[key] = item
+        dir[key] = item
+
+## fill run based histos
+for _cut_name, _hist_dict in run_hists.items():
+    for key, item in _hist_dict.items():
+        out_file[_cut_name + "/" + key] = item
 
 # All other hists
 for dict in [sum_hists, hists_2d]:
