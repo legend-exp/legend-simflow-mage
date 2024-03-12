@@ -407,29 +407,16 @@ def main():
                             len(_energy_array_tot), _energy_array_tot, np.ones(len(_energy_array_tot))
                         )
                 
+           
+
             ### 2d histos
             elif _cut_dict["is_2d"] is True:
-                
                 _energy_1_array = (
-                        df_good.groupby(df_good.index).energy.max().to_numpy(dtype=float)
-                    ) * 1000
+                    df_good.groupby(df_good.index).energy.max().to_numpy(dtype=float)
+                ) * 1000
                 _energy_2_array = (
-                        df_good.groupby(df_good.index).energy.min().to_numpy(dtype=float)
-                    ) * 1000
-                if len(_energy_array) == 0:
-                    continue
-                hists[_cut_name][_rawid].FillN(
-                    len(_energy_array), _energy_array, np.ones(len(_energy_array))
-                )
-
-        ### 2d histos
-        elif _cut_dict["is_2d"] is True:
-            _energy_1_array = (
-                df_good.groupby(df_good.index).energy.max().to_numpy(dtype=float)
-            ) * 1000
-            _energy_2_array = (
-                df_good.groupby(df_good.index).energy.min().to_numpy(dtype=float)
-            ) * 1000
+                    df_good.groupby(df_good.index).energy.min().to_numpy(dtype=float)
+                ) * 1000
 
                 _mult_channel_array = (
                             df_good.groupby(df_good.index)
@@ -469,19 +456,19 @@ def main():
                         np.ones(len(_energy_1_array_tmp)),
                     )
 
-            ## summed energy
-            else:
-                _summed_energy_array = (
-                    df_good.groupby(df_good.index).energy.sum().to_numpy(dtype=float) * 1000
-                )  # keV
-                if len(_summed_energy_array) == 0:
-                    continue
+                ## summed energy
+                else:
+                    _summed_energy_array = (
+                        df_good.groupby(df_good.index).energy.sum().to_numpy(dtype=float) * 1000
+                    )  # keV
+                    if len(_summed_energy_array) == 0:
+                        continue
 
-                sum_hists[_cut_name]["all"].FillN(
-                    len(_summed_energy_array),
-                    _summed_energy_array,
-                    np.ones(len(_summed_energy_array)),
-                )
+                    sum_hists[_cut_name]["all"].FillN(
+                        len(_summed_energy_array),
+                        _summed_energy_array,
+                        np.ones(len(_summed_energy_array)),
+                    )
 
     # The individual channels have been filled
     # now add them together to make the grouped hists
