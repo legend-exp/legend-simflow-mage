@@ -22,26 +22,48 @@
 
 import json
 import math
+import argparse
+
 from pathlib import Path
 
 from legendmeta import JsonDB, LegendMetadata
 
-prod_dir = "/data2/public/prodenv/prod-blind/ref/v02.00"
-lmeta = LegendMetadata(f"{prod_dir}/inputs")
-
-runlist = (
-    [f"l200-p03-r00{r}-phy" for r in range(6)]
-    + [f"l200-p04-r00{r}-phy" for r in range(4)]
-    + [f"l200-p06-r00{r}-phy" for r in range(7)]
-    + [f"l200-p07-r00{r}-phy" for r in range(1, 7)]
+### add an args parsers
+parser = argparse.ArgumentParser(description="Create evt tier config files for LEGEND simulation production"
 )
+
+parser.add_argument("--metadata", "-m", type=str, help="Path to proudction cycle to take legend-metadata",default="/data2/public/prodenv/prod-blind/ref-v1.0.0/")
+parser.add_argument("--hit_name", "-H", type=str, help="Name for the hit tier - either hit or pht",default="pht")
+
+dataset="p10"
+args= parser.parse_args()
+
+prod_dir =args.metadata
+hit_name =args.hit_name
+
+lmeta = LegendMetadata(f"{prod_dir}/inputs")
+runs=lmeta.dataprod.config.analysis_runs
+
+if (dataset=="vancouver"):
+    runlist = (
+        [f"l200-p03-r00{r}-phy" for r in range(6)]
+        + [f"l200-p04-r00{r}-phy" for r in range(4)]
+        + [f"l200-p06-r00{r}-phy" for r in range(7)]
+        + [f"l200-p07-r00{r}-phy" for r in range(1, 7)]
+        + [f"l200-p08-r00{r}-phy" for r in range(5)]
+        + [f"l200-p08-r00{r}-phy" for r in range(6, 10)]
+    )
+elif (dataset=="p10"):
+    runlist = (
+        [f"l200-p10-r00{r}-phy" for r in range(4)]
+      )
 
 # use FCCD values reviewed by Elisabetta
 with Path("fccd-reviewed.json").open() as f:
     fccd = json.load(f)["fccd-mm"]
 
 # get generated parameters (for energy resolution) from the data production
-par_pht_meta = JsonDB(f"{prod_dir}/generated/par/pht", lazy=True)
+par_pht_meta = JsonDB(f"{prod_dir}/generated/par/{hit_name}", lazy=True)
 
 for run in runlist:
     print(">>>", run)
