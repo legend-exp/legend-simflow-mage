@@ -89,7 +89,9 @@ else
     echo "INFO: inspecting $job"
     is_job_in_queue "$job" && exit 1
 
-    snakemake --dry-run "$@" 2> /dev/null | grep -q 'Nothing to be done' && exit 1
+    if [[ -z "$NO_CHECK" ]]; then
+        snakemake --dry-run "$@" 2> /dev/null | grep -q 'Nothing to be done' && exit 1
+    fi
 
     sbatch_submit "$job" "$logdir" "$*"
 fi
