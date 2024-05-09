@@ -58,6 +58,6 @@ if any([t in make_tiers for t in ("ver", "raw")]):
         """Reports any warning from the simulation job logs."""
         localrule: True
         params:
-            logdir=config["paths"]["log"],
+            logdir=patterns.as_ro(config, config["paths"]["log"]),
         script:
             "../scripts/inspect_MaGe_logs.sh"

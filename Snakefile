@@ -79,12 +79,13 @@ if "pdf" in make_tiers:
             Path(config["paths"]["pdf_releases"]) / (config["experiment"] + "-pdfs.tar.xz"),
         params:
             exp=config["experiment"],
+            ro_input=lambda wildcards, input: patterns.as_ro(config, input),
         shell:
             r"""
             tar --create --xz \
                 --file {output} \
                 --transform 's|.*/\({params.exp}-.*-tier_pdf\..*\)|{params.exp}-pdfs/\1|g' \
-                {input}
+                {params.ro_input}
             """
 
 
@@ -205,6 +206,8 @@ if "hit" in make_tiers:
             optmap_fiber=config["paths"]["optical_maps"]["fiber"],
         output:
             patterns.output_simjob_filename(config, tier="hit"),
+        params:
+            ro_raw_file=lambda wildcards, input: patterns.as_ro(config, input.raw_file),
         log:
             patterns.log_file_path(config, tier="hit"),
         benchmark:
@@ -238,6 +241,8 @@ if "evt" in make_tiers:
             runinfo=Path(config["paths"]["metadata"]) / "dataprod" / "runinfo.json",
         output:
             Path(config["paths"]["genconfig"]) / "{simid}-run_partition.json",
+        params:
+            ro_hit_files=lambda wildcards, input: patterns.as_ro(config, input.hit_files),
         script:
             "scripts/make_run_partition_file.py"
 
@@ -260,7 +265,7 @@ if "evt" in make_tiers:
             evt_window=lambda wildcards, input: tier_evt.smk_get_evt_window(
                 wildcards, input
             ),
-            hit_files_regex=patterns.output_simjob_regex(config, tier="hit"),
+            hit_files_regex=patterns.as_ro(config, patterns.output_simjob_regex(config, tier="hit")),
         log:
             patterns.log_evtfile_path(config),
         benchmark:
@@ -282,7 +287,8 @@ if "pdf" in make_tiers:
         output:
             patterns.output_pdf_filename(config),
         params:
-            raw_files_regex=patterns.output_simjob_regex(config, tier="raw"),
+            raw_files_regex=patterns.as_ro(config, patterns.output_simjob_regex(config, tier="raw")),
+            ro_evt_files=lambda wildcards, input: patterns.as_ro(config, input.evt_files),
         log:
             patterns.log_pdffile_path(config),
         benchmark:
