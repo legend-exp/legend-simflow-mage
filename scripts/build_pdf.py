@@ -228,7 +228,7 @@ hists = {
     and rconfig["cuts"][_cut_name]["is_2d"] is False
 }
 
-runs = meta.dataprod.config.analysis_runs
+runs = meta.dataprod.runinfo
 run_hists = {}
 for _cut_name in rconfig["cuts"]:
     if not rconfig["cuts"][_cut_name]["is_sum"]:
