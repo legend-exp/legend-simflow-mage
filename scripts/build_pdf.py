@@ -333,7 +333,7 @@ for file_name in args.input_files:
     else:
         msg = "filename doesn't contain run / period"
         raise ValueError(msg)
-
+        
     ### now open the file
     with uproot.open(f"{file_name}:simTree", object_cache=None) as pytree:
         if pytree.num_entries == 0:
@@ -343,44 +343,45 @@ for file_name in args.input_files:
         n_primaries_total += pytree["mage_n_events"].array()[0]
 
         for array in pytree.iterate(step_size="100 mB"):
+            array_copy = ak.copy(array)
             rng = np.random.default_rng()
-            array["npe_tot_poisson"] = rng.poisson(array.npe_tot)
+            array_copy["npe_tot_poisson"] = rng.poisson(array_copy.npe_tot)
 
             # compute some channel mappings
-            mage_ids = ak.flatten(array["mage_id"]).to_numpy()
+            mage_ids = ak.flatten(array_copy["mage_id"]).to_numpy()
             chmap_mage = process_mage_id(mage_ids)
             channel_to_string = get_vectorised_converter(chmap_mage["string"])
             channel_to_position = get_vectorised_converter(chmap_mage["position"])
 
             # remove below threshold hits
-            array["energy"] = array["energy"][
-                eval(f"energy > {rconfig['energy_threshold']}", globs, array)
+            array_copy["energy"] = array_copy["energy"][
+                eval(f"energy > {rconfig['energy_threshold']}", globs, array_copy)
             ]
-            array["mage_id"] = array["mage_id"][
-                eval(f"energy > {rconfig['energy_threshold']}", globs, array)
+            array_copy["mage_id"] = array_copy["mage_id"][
+                eval(f"energy > {rconfig['energy_threshold']}", globs, array_copy)
             ]
-            array["is_off"] = array["is_off"][
-                eval(f"energy > {rconfig['energy_threshold']}", globs, array)
+            array_copy["is_off"] = array_copy["is_off"][
+                eval(f"energy > {rconfig['energy_threshold']}", globs, array_copy)
             ]
-            array["is_ac"] = array["is_ac"][
-                eval(f"energy > {rconfig['energy_threshold']}", globs, array)
+            array_copy["is_ac"] = array_copy["is_ac"][
+                eval(f"energy > {rconfig['energy_threshold']}", globs, array_copy)
             ]
 
             # remove hits in off detectors
-            array["energy"] = array["energy"][~array["is_off"]]
-            array["mage_id"] = array["mage_id"][~array["is_off"]]
-            array["is_ac"] = array["is_ac"][~array["is_off"]]
+            array_copy["energy"] = array_copy["energy"][~array_copy["is_off"]]
+            array_copy["mage_id"] = array_copy["mage_id"][~array_copy["is_off"]]
+            array_copy["is_ac"] = array_copy["is_ac"][~array_copy["is_off"]]
 
             # remove records without any hit
-            array_cut = array[ak.num(array.energy, axis=-1) > 0]
+            array_copy = array_copy[ak.num(array_copy.energy, axis=-1) > 0]
 
             # compute multiplicity, the length of the
-            array_cut["mul"] = ak.num(array_cut["energy"], axis=-1)
-            array_cut["mul_is_good"] = ak.sum(~array_cut["is_ac"], axis=-1)
+            array_copy["mul"] = ak.num(array_copy["energy"], axis=-1)
+            array_copy["mul_is_good"] = ak.sum(~array_copy["is_ac"], axis=-1)
 
             # remove events with hits in AC channels
             if remove_ac_hits:
-                array_cut = array_cut[ak.all(~array_cut["is_ac"], axis=-1)]
+                array_copy = array_copy[ak.all(~array_copy["is_ac"], axis=-1)]
 
             # loop over the cuts
             for _cut_name, _cut_dict in rconfig["cuts"].items():
@@ -390,9 +391,9 @@ for file_name in args.input_files:
 
                 # if the cut string is empty return a copy, else query the array
                 if _cut_string == "":
-                    array_cut = ak.copy(array_cut)
+                    array_cut = ak.copy(array_copy)
                 else:
-                    array_cut = array[eval(_cut_string, globs, array)]
+                    array_cut = array_copy[eval(_cut_string, globs, array_copy)]
 
                 # if the cut is not sum or 2d false then flatten (by channel)
                 if _cut_dict["is_sum"] is False and _cut_dict["is_2d"] is False:
