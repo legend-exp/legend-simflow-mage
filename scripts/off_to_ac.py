@@ -23,6 +23,7 @@
 import json
 import os
 import shutil
+from pathlib import Path
 
 path = "/global/homes/t/tdixon/LEGEND/legend-simflow-config/"
 outpath = "/global/homes/t/tdixon/LEGEND/legend-simflow-config-no-ac/"
@@ -41,13 +42,12 @@ for f in files:
     if "l200" not in f:
         continue
 
-    with open(outpath + sub_path + f) as file:
+    with Path.open(outpath + sub_path + f) as file:
         cfg = json.load(file)
-    for c in cfg.keys():
+    for c in cfg:
         if cfg[c]["usability"] == "off":
-
             cfg[c]["usability"] = "ac"
             cfg[c]["energy"] = {"sig0": 1, "sig1": 0, "sig2": 0}
 
-    with open(outpath + sub_path + f, "w") as file:
+    with Path.open(outpath + sub_path + f, "w") as file:
         json.dump(cfg, file, indent=2)
