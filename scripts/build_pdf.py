@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# ruff: noqa: F821, T201
+# ruff: noqa: F821, T201, PGH001
 
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ def process_mage_id(mage_ids: np.ndarray | list[int]):
         mage_ids - a list (or numpy array) of the integer mage ids
     Returns
     ----------
-        a dictonary of the form
+        a dictionary of the form
         "channel" : {
                     mage_id : rawid,
                     ...
@@ -240,7 +240,8 @@ if args.raw_files:
     for file in args.raw_files:
         with uproot.open(f"{file}:fTree", object_cache=None) as fTree:
             n_primaries_total += fTree["fNEvents"].array(entry_stop=1)[0]
-logger.info(f"... nprimaries {n_primaries_total}")
+msg = f"... nprimaries {n_primaries_total}"
+logger.info(msg)
 
 # So there are many input files fed into one pdf file
 # set up the hists to fill as we go along
@@ -317,7 +318,8 @@ for _cut_name in rconfig["cuts"]:
             )
 
 for file_name in args.input_files:
-    logger.info(f" >>> loading file {file_name}")
+    msg = f" >>> loading file {file_name}"
+    logger.info(msg)
 
     ## get the run and period
     file_end = file_name.split("/")[-1]
@@ -329,7 +331,7 @@ for file_name in args.input_files:
         period = period[0]
         run = run[0]
     else:
-        msg = "filename doesnt contain run / period"
+        msg = "filename doesn't contain run / period"
         raise ValueError(msg)
 
     ### now open the file
@@ -372,7 +374,7 @@ for file_name in args.input_files:
             # remove records without any hit
             array_cut = array[ak.num(array.energy, axis=-1) > 0]
 
-            # compute multiplicty, the length of the
+            # compute multiplicity, the length of the
             array_cut["mul"] = ak.num(array_cut["energy"], axis=-1)
             array_cut["mul_is_good"] = ak.sum(~array_cut["is_ac"], axis=-1)
 
@@ -382,7 +384,8 @@ for file_name in args.input_files:
 
             # loop over the cuts
             for _cut_name, _cut_dict in rconfig["cuts"].items():
-                logger.debug(f"... processing cut {_cut_name}")
+                msg = f"... processing cut {_cut_name}"
+                logger.debug(msg)
                 _cut_string = _cut_dict["cut_string"]
 
                 # if the cut string is empty return a copy, else query the array
@@ -520,7 +523,8 @@ for _cut_name in hists:
 
 # write the hists to file (but only if they have none zero entries)
 # Changes the names to drop type_ etc
-logger.info(f"... writing to file {args.output}")
+msg = f"... writing to file {args.output}"
+logger.info(msg)
 out_file = uproot.recreate(args.output)
 for _cut_name, _hist_dict in hists.items():
     dir = out_file.mkdir(_cut_name)
@@ -540,6 +544,7 @@ for dict in [sum_hists, hists_2d]:
         for _sub_dir, _hist in _sub_dirs.items():
             dir[_sub_dir] = _hist
 
-logger.info(f"... nprimaries {n_primaries_total}")
+msg = f"... nprimaries {n_primaries_total}"
+logger.info(msg)
 out_file["number_of_primaries"] = str(int(n_primaries_total))
 out_file.close()

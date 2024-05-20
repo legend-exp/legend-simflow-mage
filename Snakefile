@@ -26,10 +26,10 @@ config.setdefault("benchmark", {"enabled": False})
 
 
 wildcard_constraints:
-    tier="\w+",
-    simid="[-\w]+",
-    jobid="\d+",
-    runid="[-\w]+",
+    tier=r"\w+",
+    simid=r"[-\w]+",
+    jobid=r"\d+",
+    runid=r"[-\w]+",
 
 
 rule gen_all_macros:
