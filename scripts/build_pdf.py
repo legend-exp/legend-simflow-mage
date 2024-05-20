@@ -16,21 +16,19 @@
 # ruff: noqa: F821, T201
 
 from __future__ import annotations
-from typing import List
-import json
+
 import argparse
-import awkward as ak
 import json
+import logging
 import re
 from pathlib import Path
-import sys
+from typing import List
+
+import awkward as ak
 import numpy as np
-import pandas as pd
 import ROOT
 import uproot
 from legendmeta import LegendMetadata
-
-import logging
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -41,8 +39,8 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 
-def process_mage_id(mage_ids:np.ndarray | List[int]):
-    """ 
+def process_mage_id(mage_ids: np.ndarray | List[int]):
+    """
     Function to extract the channel mapping from MaGe IDs
     Parameters
     ----------
@@ -63,7 +61,7 @@ def process_mage_id(mage_ids:np.ndarray | List[int]):
         "position": {
                     mage_id : position
                     }
-            
+
     """
     mage_names = {"name": {}, "channel": {}, "position": {}, "string": {}}
     for _mage_id in mage_ids:
@@ -194,11 +192,13 @@ parser.add_argument(
 )
 parser.add_argument("--config", "-c", required=True, help="configuration file")
 parser.add_argument("--output", "-o", required=True, help="output file name")
-parser.add_argument("--metadata", "-m", required=False, help="path to legend-metadata",default=None)
+parser.add_argument(
+    "--metadata", "-m", required=False, help="path to legend-metadata", default=None
+)
 parser.add_argument("input_files", nargs="+", help="evt tier files")
 
 args = parser.parse_args()
-remove_ac_hits=True
+remove_ac_hits = True
 
 if not isinstance(args.input_files, list):
     args.input_files = [args.input_files]
@@ -206,7 +206,7 @@ if not isinstance(args.input_files, list):
 with Path(args.config).open() as f:
     rconfig = json.load(f)
 
-if (args.metadata is None):
+if args.metadata is None:
     meta = LegendMetadata()
 else:
     meta = LegendMetadata(args.metadata)
@@ -326,10 +326,10 @@ for file_name in args.input_files:
     ## get the run and period
     file_end = file_name.split("/")[-1]
 
-    run= get_run(file_end)
-    period=get_period(file_end)
+    run = get_run(file_end)
+    period = get_period(file_end)
 
-    if (len(period)>0):
+    if len(period) > 0:
         period = period[0]
         run = run[0]
     else:
@@ -344,7 +344,7 @@ for file_name in args.input_files:
         n_primaries_total += pytree["mage_n_events"].array()[0]
 
         for array in pytree.iterate(step_size="100 mB"):
-           
+
             rng = np.random.default_rng()
             array["npe_tot_poisson"] = rng.poisson(array.npe_tot)
 
@@ -354,56 +354,70 @@ for file_name in args.input_files:
             channel_to_string = get_vectorised_converter(chmap_mage["string"])
             channel_to_position = get_vectorised_converter(chmap_mage["position"])
 
-
             # remove below threshold hits
-            array["energy"]=array["energy"][eval(f"energy > {rconfig['energy_threshold']}",globs,array)]
-            array["mage_id"]=array["mage_id"][eval(f"energy > {rconfig['energy_threshold']}",globs,array)]
-            array["is_off"]=array["is_off"][eval(f"energy > {rconfig['energy_threshold']}",globs,array)]
-            array["is_ac"]=array["is_ac"][eval(f"energy > {rconfig['energy_threshold']}",globs,array)]
+            array["energy"] = array["energy"][
+                eval(f"energy > {rconfig['energy_threshold']}", globs, array)
+            ]
+            array["mage_id"] = array["mage_id"][
+                eval(f"energy > {rconfig['energy_threshold']}", globs, array)
+            ]
+            array["is_off"] = array["is_off"][
+                eval(f"energy > {rconfig['energy_threshold']}", globs, array)
+            ]
+            array["is_ac"] = array["is_ac"][
+                eval(f"energy > {rconfig['energy_threshold']}", globs, array)
+            ]
 
             # remove hits in off detectors
-            array["energy"]=array["energy"][~array["is_off"]]
-            array["mage_id"]=array["mage_id"][~array["is_off"]]
-            array["is_ac"]=array["is_ac"][~array["is_off"]]
+            array["energy"] = array["energy"][~array["is_off"]]
+            array["mage_id"] = array["mage_id"][~array["is_off"]]
+            array["is_ac"] = array["is_ac"][~array["is_off"]]
 
             # remove records without any hit
-            array = array[ak.num(array.energy,axis=-1)>0]
+            array = array[ak.num(array.energy, axis=-1) > 0]
 
-            # compute multiplicty, the length of the 
-            array["mul"] = ak.num(array["energy"],axis=-1)
-            array["mul_is_good"] = ak.sum(~array["is_ac"],axis=-1)
+            # compute multiplicty, the length of the
+            array["mul"] = ak.num(array["energy"], axis=-1)
+            array["mul_is_good"] = ak.sum(~array["is_ac"], axis=-1)
 
             # remove events with hits in AC channels
-            if (remove_ac_hits):
-                array = array[ak.all(array["is_ac"]==False,axis=-1)]
+            if remove_ac_hits:
+                array = array[ak.all(array["is_ac"] == False, axis=-1)]
 
             # loop over the cuts
             for _cut_name, _cut_dict in rconfig["cuts"].items():
-                
+
                 logger.debug(f"... processing cut {_cut_name}")
                 _cut_string = _cut_dict["cut_string"]
 
                 # if the cut string is empty return a copy, else query the array
                 if _cut_string == "":
-                    array_cut= ak.copy(array)
+                    array_cut = ak.copy(array)
                 else:
-                    array_cut= array[eval(_cut_string,globs,array)]
-                
+                    array_cut = array[eval(_cut_string, globs, array)]
+
                 # if the cut is not sum or 2d false then flatten (by channel)
                 if _cut_dict["is_sum"] is False and _cut_dict["is_2d"] is False:
                     for __mage_id in mage_ids:
                         _rawid = chmap_mage["channel"][__mage_id]
-                        
-                        # extract the energy array (flattening)
-                        _energy_array = (ak.flatten(array_cut["energy"][(array_cut["mage_id"] == __mage_id)
-                                                            ],axis=-1).to_numpy()*1000)
 
-            
+                        # extract the energy array (flattening)
+                        _energy_array = (
+                            ak.flatten(
+                                array_cut["energy"][
+                                    (array_cut["mage_id"] == __mage_id)
+                                ],
+                                axis=-1,
+                            ).to_numpy()
+                            * 1000
+                        )
 
                         if len(_energy_array) == 0:
                             continue
                         hists[_cut_name][_rawid].FillN(
-                            len(_energy_array), _energy_array, np.ones(len(_energy_array))
+                            len(_energy_array),
+                            _energy_array,
+                            np.ones(len(_energy_array)),
                         )
 
                         # fill also time dependent hists
@@ -415,19 +429,27 @@ for file_name in args.input_files:
 
                 # 2d histos
                 elif _cut_dict["is_2d"] is True:
-                    _energy_1_array = (ak.max(array_cut["energy"],axis=-1).to_numpy()*1000)
-                    _energy_2_array = (ak.min(array_cut["energy"],axis=-1).to_numpy()*1000)
-                    
+                    _energy_1_array = (
+                        ak.max(array_cut["energy"], axis=-1).to_numpy() * 1000
+                    )
+                    _energy_2_array = (
+                        ak.min(array_cut["energy"], axis=-1).to_numpy() * 1000
+                    )
+
                     _mult_channel_array = array_cut["mage_id"].to_numpy()
 
                     # loop over categories
                     for name in names_m2:
                         if name != "all":
                             categories = get_m2_categories(
-                                _mult_channel_array, channel_to_string, channel_to_position
+                                _mult_channel_array,
+                                channel_to_string,
+                                channel_to_position,
                             )
                             string_diff, floor_diff = get_string_row_diff(
-                                _mult_channel_array, channel_to_string, channel_to_position
+                                _mult_channel_array,
+                                channel_to_string,
+                                channel_to_position,
                             )
 
                             if "cat" in name:
@@ -461,7 +483,9 @@ for file_name in args.input_files:
 
                 ## summed energy
                 else:
-                    _summed_energy_array =  (ak.sum(array_cut["energy"],axis=-1).to_numpy()*1000)
+                    _summed_energy_array = (
+                        ak.sum(array_cut["energy"], axis=-1).to_numpy() * 1000
+                    )
 
                     if len(_summed_energy_array) == 0:
                         continue

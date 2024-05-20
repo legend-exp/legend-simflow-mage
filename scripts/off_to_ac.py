@@ -21,38 +21,33 @@
 
 
 import json
-import math
-from pathlib import Path
-import shutil
-import json
 import os
-from legendmeta import JsonDB, LegendMetadata
-
+import shutil
 
 path = "/global/homes/t/tdixon/LEGEND/legend-simflow-config/"
-outpath="/global/homes/t/tdixon/LEGEND/legend-simflow-config-no-ac/"
+outpath = "/global/homes/t/tdixon/LEGEND/legend-simflow-config-no-ac/"
 
 sub_path = "tier/evt/l200a/"
 try:
     shutil.rmtree(outpath)
-    shutil.copytree(path,outpath)
+    shutil.copytree(path, outpath)
 except shutil.Error as e:
     print(f"Error: {e}")
 except OSError as e:
     print(f"Error: {e}")
 
-files = os.listdir(outpath+sub_path)
+files = os.listdir(outpath + sub_path)
 for f in files:
     if "l200" not in f:
         continue
 
-    with open(outpath+sub_path+f, 'r') as file:
-        cfg=json.load(file)
+    with open(outpath + sub_path + f) as file:
+        cfg = json.load(file)
     for c in cfg.keys():
-        if (cfg[c]['usability']=="off"):
+        if cfg[c]["usability"] == "off":
 
-            cfg[c]['usability']="ac"
-            cfg[c]["energy"]={"sig0":1,"sig1":0,"sig2":0}
+            cfg[c]["usability"] = "ac"
+            cfg[c]["energy"] = {"sig0": 1, "sig1": 0, "sig2": 0}
 
-    with open(outpath+sub_path+f, 'w') as file:
+    with open(outpath + sub_path + f, "w") as file:
         json.dump(cfg, file, indent=2)
