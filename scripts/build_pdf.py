@@ -89,14 +89,13 @@ def process_mage_id(mage_ids:np.ndarray | List[int]):
 
 
 def get_run(text):
-    pattern = re.compile(r'r\d\d\d')
+    pattern = re.compile(r"r\d\d\d")
     return re.findall(pattern, text)
 
 
 def get_period(text):
-    pattern = re.compile(r'p\d\d')
+    pattern = re.compile(r"p\d\d")
     return re.findall(pattern, text)
-    
 
 
 def get_m2_categories(channel_array, channel_to_string, channel_to_position):
@@ -334,8 +333,7 @@ for file_name in args.input_files:
         period = period[0]
         run = run[0]
     else:
-        period="p03"
-        run="r000"
+        raise ValueError("filename doesnt contain run / period")
 
     ### now open the file
     with uproot.open(f"{file_name}:simTree", object_cache=None) as pytree:
