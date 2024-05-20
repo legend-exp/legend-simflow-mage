@@ -22,7 +22,6 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import List
 
 import awkward as ak
 import numpy as np
@@ -39,7 +38,7 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 
-def process_mage_id(mage_ids: np.ndarray | List[int]):
+def process_mage_id(mage_ids: np.ndarray | list[int]):
     """
     Function to extract the channel mapping from MaGe IDs
     Parameters
@@ -206,10 +205,7 @@ if not isinstance(args.input_files, list):
 with Path(args.config).open() as f:
     rconfig = json.load(f)
 
-if args.metadata is None:
-    meta = LegendMetadata()
-else:
-    meta = LegendMetadata(args.metadata)
+meta = LegendMetadata() if args.metadata is None else LegendMetadata(args.metadata)
 
 chmap = meta.channelmap(rconfig["timestamp"])
 globs = {"ak": ak, "np": np}
@@ -333,7 +329,8 @@ for file_name in args.input_files:
         period = period[0]
         run = run[0]
     else:
-        raise ValueError("filename doesnt contain run / period")
+        msg = "filename doesnt contain run / period"
+        raise ValueError(msg)
 
     ### now open the file
     with uproot.open(f"{file_name}:simTree", object_cache=None) as pytree:
@@ -344,7 +341,6 @@ for file_name in args.input_files:
         n_primaries_total += pytree["mage_n_events"].array()[0]
 
         for array in pytree.iterate(step_size="100 mB"):
-
             rng = np.random.default_rng()
             array["npe_tot_poisson"] = rng.poisson(array.npe_tot)
 
@@ -374,25 +370,24 @@ for file_name in args.input_files:
             array["is_ac"] = array["is_ac"][~array["is_off"]]
 
             # remove records without any hit
-            array = array[ak.num(array.energy, axis=-1) > 0]
+            array_cut = array[ak.num(array.energy, axis=-1) > 0]
 
             # compute multiplicty, the length of the
-            array["mul"] = ak.num(array["energy"], axis=-1)
-            array["mul_is_good"] = ak.sum(~array["is_ac"], axis=-1)
+            array_cut["mul"] = ak.num(array_cut["energy"], axis=-1)
+            array_cut["mul_is_good"] = ak.sum(~array_cut["is_ac"], axis=-1)
 
             # remove events with hits in AC channels
             if remove_ac_hits:
-                array = array[ak.all(array["is_ac"] == False, axis=-1)]
+                array_cut = array_cut[ak.all(~array_cut["is_ac"], axis=-1)]
 
             # loop over the cuts
             for _cut_name, _cut_dict in rconfig["cuts"].items():
-
                 logger.debug(f"... processing cut {_cut_name}")
                 _cut_string = _cut_dict["cut_string"]
 
                 # if the cut string is empty return a copy, else query the array
                 if _cut_string == "":
-                    array_cut = ak.copy(array)
+                    array_cut = ak.copy(array_cut)
                 else:
                     array_cut = array[eval(_cut_string, globs, array)]
 
