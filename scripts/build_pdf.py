@@ -349,7 +349,7 @@ for file_name in args.input_files:
             array_copy["npe_tot_poisson"] = rng.poisson(array_copy.npe_tot)
 
             # compute some channel mappings
-            mage_ids = ak.flatten(array_copy["mage_id"]).to_numpy()
+            mage_ids = np.unique(ak.flatten(array_copy["mage_id"]).to_numpy())
 
             chmap_mage = process_mage_id(mage_ids)
             channel_to_string = get_vectorised_converter(chmap_mage["string"])
