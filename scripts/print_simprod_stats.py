@@ -31,7 +31,7 @@ printline("     ", "wall time [s]", "    ", "wall time [s]", "         ")
 printline("simid", " (cumulative)", "jobs", "    (per job)", "primaries")
 printline("-----", "-------------", "----", "-------------", "---------")
 
-bdir = Path(snakemake.config["paths"]["benchmarks"])
+bdir = Path(patterns.as_ro(snakemake.config, snakemake.config["paths"]["benchmarks"]))
 
 tot_wall_time = 0
 for simd in sorted(bdir.glob("*/*")):

@@ -35,7 +35,7 @@ print(
     + snakemake.wildcards.simid
 )
 file_evts = uproot.num_entries(
-    [f"{file}:simTree" for file in snakemake.input.hit_files]
+    [f"{file}:simTree" for file in snakemake.params.ro_hit_files]
 )
 tot_events = 0
 for file in file_evts:

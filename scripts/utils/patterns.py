@@ -28,9 +28,24 @@ Definitions:
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from snakemake.io import expand
+
+
+def as_ro(config, path):
+    if "read_only_fs_sub_pattern" not in config:
+        return path
+
+    sub_pattern = config["read_only_fs_sub_pattern"]
+
+    if isinstance(path, str):
+        return re.sub(*sub_pattern, path)
+    if isinstance(path, Path):
+        return Path(re.sub(*sub_pattern, path.name))
+
+    return [as_ro(config, p) for p in path]
 
 
 def simjob_rel_basename(**kwargs):

@@ -18,6 +18,8 @@
 import csv
 from pathlib import Path
 
+from utils import patterns
+
 
 def printline(*line):
     print("{:<52}{:>16}{:>11}{:>23}".format(*line))
@@ -26,7 +28,7 @@ def printline(*line):
 printline("simid", "CPU time [ms/ev]", "evts / 1h", "jobs (1h) / 10^8 evts")
 printline("-----", "----------------", "---------", "---------------------")
 
-bdir = Path(snakemake.config["paths"]["benchmarks"])
+bdir = Path(patterns.as_ro(snakemake.config, snakemake.config["paths"]["benchmarks"]))
 
 for simd in sorted(bdir.glob("*/*")):
     if simd.parent.name not in ("ver", "raw"):

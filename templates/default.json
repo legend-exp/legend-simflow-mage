@@ -1,6 +1,7 @@
 {
   "experiment": "l200a",
   "simlist": "all",
+  "make_tiers": ["raw", "hit", "evt", "pdf"],
   "runlist": [
     "l200-p03-r000-phy",
     "l200-p03-r001-phy",

@@ -264,7 +264,7 @@ hists = {
     and rconfig["cuts"][_cut_name]["is_2d"] is False
 }
 
-runs = meta.dataprod.config.analysis_runs
+runs = meta.dataprod.runinfo
 run_hists = {}
 for _cut_name in rconfig["cuts"]:
     if not rconfig["cuts"][_cut_name]["is_sum"]:
@@ -343,17 +343,20 @@ for file_name in args.input_files:
         n_primaries_total += pytree["mage_n_events"].array()[0]
 
         for array in pytree.iterate(step_size="100 mB"):
+
             array_copy = ak.copy(array)
             rng = np.random.default_rng()
             array_copy["npe_tot_poisson"] = rng.poisson(array_copy.npe_tot)
 
             # compute some channel mappings
             mage_ids = ak.flatten(array_copy["mage_id"]).to_numpy()
+
             chmap_mage = process_mage_id(mage_ids)
             channel_to_string = get_vectorised_converter(chmap_mage["string"])
             channel_to_position = get_vectorised_converter(chmap_mage["position"])
 
             # remove below threshold hits
+
             array_copy["energy"] = array_copy["energy"][
                 eval(f"energy > {rconfig['energy_threshold']}", globs, array_copy)
             ]
@@ -394,6 +397,7 @@ for file_name in args.input_files:
                     array_cut = ak.copy(array_copy)
                 else:
                     array_cut = array_copy[eval(_cut_string, globs, array_copy)]
+
 
                 # if the cut is not sum or 2d false then flatten (by channel)
                 if _cut_dict["is_sum"] is False and _cut_dict["is_2d"] is False:
