@@ -13,24 +13,55 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# ruff: noqa: F821, T201
+# ruff: noqa: F821, T201, PGH001
 
 from __future__ import annotations
 
 import argparse
 import json
+import logging
 import re
 from pathlib import Path
 
+import awkward as ak
 import numpy as np
-import pandas as pd
 import ROOT
 import uproot
 from legendmeta import LegendMetadata
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+stream_handler = logging.StreamHandler()
+stream_handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter("%(asctime)s: %(message)s")
+stream_handler.setFormatter(formatter)
+logger.addHandler(stream_handler)
 
-def process_mage_id(mage_ids):
-    """ """
+
+def process_mage_id(mage_ids: np.ndarray | list[int]):
+    """
+    Function to extract the channel mapping from MaGe IDs
+    Parameters
+    ----------
+        mage_ids - a list (or numpy array) of the integer mage ids
+    Returns
+    ----------
+        a dictionary of the form
+        "channel" : {
+                    mage_id : rawid,
+                    ...
+                    },
+        "name"    : {
+                    mage_id : detector name (eg V021...)
+                    },
+        "string"  : {
+                    mage_id :string,
+                    },
+        "position": {
+                    mage_id : position
+                    }
+
+    """
     mage_names = {"name": {}, "channel": {}, "position": {}, "string": {}}
     for _mage_id in mage_ids:
         m_id = str(_mage_id)
@@ -160,10 +191,13 @@ parser.add_argument(
 )
 parser.add_argument("--config", "-c", required=True, help="configuration file")
 parser.add_argument("--output", "-o", required=True, help="output file name")
-parser.add_argument("--metadata", "-m", required=True, help="path to legend-metadata")
+parser.add_argument(
+    "--metadata", "-m", required=False, help="path to legend-metadata", default=None
+)
 parser.add_argument("input_files", nargs="+", help="evt tier files")
 
 args = parser.parse_args()
+remove_ac_hits = True
 
 if not isinstance(args.input_files, list):
     args.input_files = [args.input_files]
@@ -171,10 +205,12 @@ if not isinstance(args.input_files, list):
 with Path(args.config).open() as f:
     rconfig = json.load(f)
 
-meta = LegendMetadata(args.metadata)
+meta = LegendMetadata() if args.metadata is None else LegendMetadata(args.metadata)
+
 chmap = meta.channelmap(rconfig["timestamp"])
-# We don't have a list of mage_ids so these need to be instantiated and checked
-# in the loop of sim data
+globs = {"ak": ak, "np": np}
+
+
 chmap_mage = None
 channel_to_string = None
 channel_to_position = None
@@ -199,19 +235,19 @@ strings = np.sort([item[1] for item in geds_strings.items()])
 
 n_primaries_total = 0
 
-# NOTE: This doesn't seem to work, returns zeros
-print("INFO: computing number of simulated primaries from raw files")
+logger.info("... computing number of simulated primaries from raw files")
 if args.raw_files:
     for file in args.raw_files:
         with uproot.open(f"{file}:fTree", object_cache=None) as fTree:
             n_primaries_total += fTree["fNEvents"].array(entry_stop=1)[0]
-print("INFO: nprimaries", n_primaries_total)
+msg = f"... nprimaries {n_primaries_total}"
+logger.info(msg)
 
 # So there are many input files fed into one pdf file
 # set up the hists to fill as we go along
 # Creat a hist for all dets (even AC ones)
 
-print("INFO: initializing histograms")
+logger.info("... initializing histograms")
 hists = {
     _cut_name: {
         _rawid: ROOT.TH1F(
@@ -282,22 +318,21 @@ for _cut_name in rconfig["cuts"]:
             )
 
 for file_name in args.input_files:
-    print("INFO: loading file", file_name)
+    msg = f" >>> loading file {file_name}"
+    logger.info(msg)
 
     ## get the run and period
     file_end = file_name.split("/")[-1]
 
     run = get_run(file_end)
     period = get_period(file_end)
-    if len(run) != 1:
-        err = "Error filename doesn't contain a unique pattern rXYZ"
-        raise ValueError(err)
-    if len(period) != 1:
-        err = "Error filename doesn't contain a unique pattern pXY"
-        raise ValueError(err)
 
-    period = period[0]
-    run = run[0]
+    if len(period) > 0:
+        period = period[0]
+        run = run[0]
+    else:
+        msg = "filename doesn't contain run / period"
+        raise ValueError(msg)
 
     ### now open the file
     with uproot.open(f"{file_name}:simTree", object_cache=None) as pytree:
@@ -305,148 +340,164 @@ for file_name in args.input_files:
             msg = f"ERROR: MPP evt file {file_name} has 0 events in simTree"
             raise RuntimeError(msg)
 
-        n_primaries = pytree["mage_n_events"].array()[0]
-        df_data = pd.DataFrame(
-            pytree.arrays(["energy", "npe_tot", "mage_id", "is_good"], library="np")
-        )
+        n_primaries_total += pytree["mage_n_events"].array()[0]
 
-    print("INFO: processing data")
+        for array in pytree.iterate(step_size="100 mB"):
+            rng = np.random.default_rng()
+            array["npe_tot_poisson"] = rng.poisson(array.npe_tot)
 
-    # add a column with Poisson(mu=npe_tot) to represent the actual random
-    # number of detected photons. This column should be used to determine
-    # the LAr classifier
-    rng = np.random.default_rng()
-    df_data["npe_tot_poisson"] = rng.poisson(df_data.npe_tot)
+            # compute some channel mappings
+            mage_ids = ak.flatten(array["mage_id"]).to_numpy()
+            chmap_mage = process_mage_id(mage_ids)
+            channel_to_string = get_vectorised_converter(chmap_mage["string"])
+            channel_to_position = get_vectorised_converter(chmap_mage["position"])
 
-    # Data has awkward length lists per event
-    # exploding gives a dataframe with multiple rows per event (event no. is the index)
-    df_exploded = df_data.explode(["energy", "mage_id", "is_good"])
+            # remove below threshold hits
+            array["energy"] = array["energy"][
+                eval(f"energy > {rconfig['energy_threshold']}", globs, array)
+            ]
+            array["mage_id"] = array["mage_id"][
+                eval(f"energy > {rconfig['energy_threshold']}", globs, array)
+            ]
+            array["is_off"] = array["is_off"][
+                eval(f"energy > {rconfig['energy_threshold']}", globs, array)
+            ]
+            array["is_ac"] = array["is_ac"][
+                eval(f"energy > {rconfig['energy_threshold']}", globs, array)
+            ]
 
-    # Doing this over and over again maybe slow
-    chmap_mage = process_mage_id(
-        df_exploded.dropna(subset=["mage_id"])["mage_id"].unique()
-    )
-    channel_to_string = get_vectorised_converter(chmap_mage["string"])
-    channel_to_position = get_vectorised_converter(chmap_mage["position"])
+            # remove hits in off detectors
+            array["energy"] = array["energy"][~array["is_off"]]
+            array["mage_id"] = array["mage_id"][~array["is_off"]]
+            array["is_ac"] = array["is_ac"][~array["is_off"]]
 
-    # Apply the real energy cut for effetcive event reconstruction
-    df_ecut = df_exploded.query(f"energy > {rconfig['energy_threshold']}")
+            # remove records without any hit
+            array_cut = array[ak.num(array.energy, axis=-1) > 0]
 
-    # These give you the multiplicity of events (and events not including AC detectors)
-    index_counts = df_ecut.index.value_counts()
-    index_counts_is_good = df_ecut.query("is_good == True").index.value_counts()
+            # compute multiplicity, the length of the
+            array_cut["mul"] = ak.num(array_cut["energy"], axis=-1)
+            array_cut["mul_is_good"] = ak.sum(~array_cut["is_ac"], axis=-1)
 
-    # Add columns for configuration file cuts (NOTE: quite slow)
-    df_ecut = df_ecut.copy()
-    df_ecut["mul"] = df_ecut.index.map(index_counts)
-    df_ecut["mul_is_good"] = df_ecut.index.map(index_counts_is_good)
+            # remove events with hits in AC channels
+            if remove_ac_hits:
+                array_cut = array_cut[ak.all(~array_cut["is_ac"], axis=-1)]
 
-    n_primaries_total += n_primaries
+            # loop over the cuts
+            for _cut_name, _cut_dict in rconfig["cuts"].items():
+                msg = f"... processing cut {_cut_name}"
+                logger.debug(msg)
+                _cut_string = _cut_dict["cut_string"]
 
-    for _cut_name, _cut_dict in rconfig["cuts"].items():
-        # We want to cut on multiplicity for all detectors >25keV, even AC
-        # Include them in the dataset then apply cuts - then filter them out
-        # Don't store AC detectors
-        _cut_string = _cut_dict["cut_string"]
-        df_cut = df_ecut.copy() if _cut_string == "" else df_ecut.query(_cut_string)
-        df_good = df_cut[df_cut.is_good == True]  # noqa: E712
-
-        if _cut_dict["is_sum"] is False and _cut_dict["is_2d"] is False:
-            for __mage_id in df_good.mage_id.unique():
-                _rawid = chmap_mage["channel"][__mage_id]
-                _energy_array = (
-                    df_good[df_good.mage_id == __mage_id].energy.to_numpy(dtype=float)
-                    * 1000
-                )  # keV
-
-                if len(_energy_array) == 0:
-                    continue
-                hists[_cut_name][_rawid].FillN(
-                    len(_energy_array), _energy_array, np.ones(len(_energy_array))
-                )
-
-            ### fill also time dependent hists
-            _energy_array_tot = df_good.energy.to_numpy(dtype=float) * 1000
-
-            if len(_energy_array_tot) == 0:
-                continue
-            run_hists[_cut_name][f"{period}_{run}"].FillN(
-                len(_energy_array_tot),
-                _energy_array_tot,
-                np.ones(len(_energy_array_tot)),
-            )
-
-        ### 2d histos
-        elif _cut_dict["is_2d"] is True:
-            _energy_1_array = (
-                df_good.groupby(df_good.index).energy.max().to_numpy(dtype=float)
-            ) * 1000
-            _energy_2_array = (
-                df_good.groupby(df_good.index).energy.min().to_numpy(dtype=float)
-            ) * 1000
-
-            _mult_channel_array = (
-                df_good.groupby(df_good.index)
-                .mage_id.apply(lambda x: x.to_numpy())
-                .to_numpy()
-            )
-            ### loop over categories
-            for name in names_m2:
-                if name != "all":
-                    categories = get_m2_categories(
-                        _mult_channel_array, channel_to_string, channel_to_position
-                    )
-                    string_diff, floor_diff = get_string_row_diff(
-                        _mult_channel_array, channel_to_string, channel_to_position
-                    )
-
-                    if "cat" in name:
-                        cat = int(name.split("_")[1])
-                        _energy_1_array_tmp = np.array(_energy_1_array)[
-                            np.where(categories == cat)[0]
-                        ]
-                        _energy_2_array_tmp = np.array(_energy_2_array)[
-                            np.where(categories == cat)[0]
-                        ]
-
-                    elif "sd" in name:
-                        sd = int(name.split("_")[1])
-
-                        ids = np.where(string_diff == sd)[0]
-                        _energy_1_array_tmp = np.array(_energy_1_array)[ids]
-                        _energy_2_array_tmp = np.array(_energy_2_array)[ids]
-
+                # if the cut string is empty return a copy, else query the array
+                if _cut_string == "":
+                    array_cut = ak.copy(array_cut)
                 else:
-                    _energy_1_array_tmp = np.array(_energy_1_array)
-                    _energy_2_array_tmp = np.array(_energy_2_array)
+                    array_cut = array[eval(_cut_string, globs, array)]
 
-                if len(_energy_1_array_tmp) == 0:
-                    continue
-                hists_2d[_cut_name][name].FillN(
-                    len(_energy_1_array_tmp),
-                    _energy_2_array_tmp,
-                    _energy_1_array_tmp,
-                    np.ones(len(_energy_1_array_tmp)),
-                )
+                # if the cut is not sum or 2d false then flatten (by channel)
+                if _cut_dict["is_sum"] is False and _cut_dict["is_2d"] is False:
+                    for __mage_id in mage_ids:
+                        _rawid = chmap_mage["channel"][__mage_id]
 
-        ## summed energy
-        else:
-            _summed_energy_array = (
-                df_good.groupby(df_good.index).energy.sum().to_numpy(dtype=float) * 1000
-            )  # keV
-            if len(_summed_energy_array) == 0:
-                continue
+                        # extract the energy array (flattening)
+                        _energy_array = (
+                            ak.flatten(
+                                array_cut["energy"][
+                                    (array_cut["mage_id"] == __mage_id)
+                                ],
+                                axis=-1,
+                            ).to_numpy()
+                            * 1000
+                        )
 
-            sum_hists[_cut_name]["all"].FillN(
-                len(_summed_energy_array),
-                _summed_energy_array,
-                np.ones(len(_summed_energy_array)),
-            )
+                        if len(_energy_array) == 0:
+                            continue
+                        hists[_cut_name][_rawid].FillN(
+                            len(_energy_array),
+                            _energy_array,
+                            np.ones(len(_energy_array)),
+                        )
+
+                        # fill also time dependent hists
+                        run_hists[_cut_name][f"{period}_{run}"].FillN(
+                            len(_energy_array),
+                            _energy_array,
+                            np.ones(len(_energy_array)),
+                        )
+
+                # 2d histos
+                elif _cut_dict["is_2d"] is True:
+                    _energy_1_array = (
+                        ak.max(array_cut["energy"], axis=-1).to_numpy() * 1000
+                    )
+                    _energy_2_array = (
+                        ak.min(array_cut["energy"], axis=-1).to_numpy() * 1000
+                    )
+
+                    _mult_channel_array = array_cut["mage_id"].to_numpy()
+
+                    # loop over categories
+                    for name in names_m2:
+                        if name != "all":
+                            categories = get_m2_categories(
+                                _mult_channel_array,
+                                channel_to_string,
+                                channel_to_position,
+                            )
+                            string_diff, floor_diff = get_string_row_diff(
+                                _mult_channel_array,
+                                channel_to_string,
+                                channel_to_position,
+                            )
+
+                            if "cat" in name:
+                                cat = int(name.split("_")[1])
+                                _energy_1_array_tmp = np.array(_energy_1_array)[
+                                    np.where(categories == cat)[0]
+                                ]
+                                _energy_2_array_tmp = np.array(_energy_2_array)[
+                                    np.where(categories == cat)[0]
+                                ]
+
+                            elif "sd" in name:
+                                sd = int(name.split("_")[1])
+
+                                ids = np.where(string_diff == sd)[0]
+                                _energy_1_array_tmp = np.array(_energy_1_array)[ids]
+                                _energy_2_array_tmp = np.array(_energy_2_array)[ids]
+
+                        else:
+                            _energy_1_array_tmp = np.array(_energy_1_array)
+                            _energy_2_array_tmp = np.array(_energy_2_array)
+
+                        if len(_energy_1_array_tmp) == 0:
+                            continue
+                        hists_2d[_cut_name][name].FillN(
+                            len(_energy_1_array_tmp),
+                            _energy_2_array_tmp,
+                            _energy_1_array_tmp,
+                            np.ones(len(_energy_1_array_tmp)),
+                        )
+
+                ## summed energy
+                else:
+                    _summed_energy_array = (
+                        ak.sum(array_cut["energy"], axis=-1).to_numpy() * 1000
+                    )
+
+                    if len(_summed_energy_array) == 0:
+                        continue
+
+                    sum_hists[_cut_name]["all"].FillN(
+                        len(_summed_energy_array),
+                        _summed_energy_array,
+                        np.ones(len(_summed_energy_array)),
+                    )
 
 # The individual channels have been filled
 # now add them together to make the grouped hists
 # We don't need to worry about the AC dets as they will have zero entries
-print("INFO: making grouped pdfs")
+logger.info("... making grouped pdfs")
 for _cut_name in hists:
     hists[_cut_name]["all"] = ROOT.TH1F(
         f"{_cut_name}_all",
@@ -472,7 +523,8 @@ for _cut_name in hists:
 
 # write the hists to file (but only if they have none zero entries)
 # Changes the names to drop type_ etc
-print("INFO: writing to file", args.output)
+msg = f"... writing to file {args.output}"
+logger.info(msg)
 out_file = uproot.recreate(args.output)
 for _cut_name, _hist_dict in hists.items():
     dir = out_file.mkdir(_cut_name)
@@ -492,6 +544,7 @@ for dict in [sum_hists, hists_2d]:
         for _sub_dir, _hist in _sub_dirs.items():
             dir[_sub_dir] = _hist
 
-print("INFO: nprimaries", n_primaries_total)
+msg = f"... nprimaries {n_primaries_total}"
+logger.info(msg)
 out_file["number_of_primaries"] = str(int(n_primaries_total))
 out_file.close()
