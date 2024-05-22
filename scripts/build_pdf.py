@@ -398,6 +398,8 @@ for file_name in args.input_files:
                 else:
                     array_cut = array_copy[eval(_cut_string, globs, array_copy)]
 
+                if len(array_cut) == 0:
+                    continue
 
                 # if the cut is not sum or 2d false then flatten (by channel)
                 if _cut_dict["is_sum"] is False and _cut_dict["is_2d"] is False:
