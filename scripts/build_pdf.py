@@ -345,6 +345,7 @@ for file_name in args.input_files:
         raise ValueError(msg)
 
     # now open the file
+
     with uproot.open(f"{file_name}:simTree", object_cache=None) as pytree:
         if pytree.num_entries == 0:
             msg = f"ERROR: MPP evt file {file_name} has 0 events in simTree"
@@ -352,7 +353,9 @@ for file_name in args.input_files:
 
         n_primaries_total += pytree["mage_n_events"].array()[0]
 
+
         for array in pytree.iterate(step_size="100 MB"):
+
 
             array_copy = ak.copy(array)
             rng = np.random.default_rng()
@@ -360,6 +363,7 @@ for file_name in args.input_files:
 
             # compute some channel mappings
             mage_ids = np.unique(ak.flatten(array_copy["mage_id"]).to_numpy())
+
 
             # get channel mappings
             chmap_mage = process_mage_id(mage_ids)
