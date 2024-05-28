@@ -59,10 +59,13 @@ def process_mage_id(mage_ids: np.ndarray | list[int]):
                     },
         "position": {
                     mage_id : position
+                    },
+        "type":     {
+                    mage_id : type
                     }
 
     """
-    mage_names = {"name": {}, "channel": {}, "position": {}, "string": {}}
+    mage_names = {"name": {}, "channel": {}, "position": {}, "string": {}, "type": {}}
     for _mage_id in mage_ids:
         m_id = str(_mage_id)
         is_ged = bool(int(m_id[0]))
@@ -81,6 +84,7 @@ def process_mage_id(mage_ids: np.ndarray | list[int]):
                     mage_names["name"][_mage_id] = _name
                     mage_names["string"][_mage_id] = int(string)
                     mage_names["position"][_mage_id] = int(pos)
+                    mage_names["type"][_mage_id] = _meta_dict["type"]
 
     return mage_names
 
@@ -230,6 +234,11 @@ geds_positions = {
     for _name, _dict in chmap.items()
     if chmap[_name]["system"] == "geds"
 }
+geds_types = {
+    f"ch{_dict['daq']['rawid']}": _dict["type"]
+    for _name, _dict in chmap.items()
+    if chmap[_name]["system"] == "geds"
+}
 
 strings = np.sort([item[1] for item in geds_strings.items()])
 
@@ -291,6 +300,7 @@ string_diff = np.arange(7)
 floor_diff = np.arange(8)
 names_m2 = [f"sd_{item1}" for item1 in string_diff]
 names_m2.extend(["all", "cat_1", "cat_2", "cat_3"])
+names_m2.extend(["e1_icpc", "e1_bege", "e1_ppc", "e2_coax"])
 
 for _cut_name in rconfig["cuts"]:
     if rconfig["cuts"][_cut_name]["is_sum"] is True:
@@ -333,8 +343,8 @@ for file_name in args.input_files:
     else:
         msg = "filename doesn't contain run / period"
         raise ValueError(msg)
-        
-    ### now open the file
+
+    # now open the file
     with uproot.open(f"{file_name}:simTree", object_cache=None) as pytree:
         if pytree.num_entries == 0:
             msg = f"ERROR: MPP evt file {file_name} has 0 events in simTree"
@@ -342,18 +352,20 @@ for file_name in args.input_files:
 
         n_primaries_total += pytree["mage_n_events"].array()[0]
 
-        for array in pytree.iterate(step_size="100 mB"):
+        for array in pytree.iterate(step_size="100 MB"):
 
             array_copy = ak.copy(array)
             rng = np.random.default_rng()
             array_copy["npe_tot_poisson"] = rng.poisson(array_copy.npe_tot)
 
             # compute some channel mappings
-            mage_ids = ak.flatten(array_copy["mage_id"]).to_numpy()
+            mage_ids = np.unique(ak.flatten(array_copy["mage_id"]).to_numpy())
 
+            # get channel mappings
             chmap_mage = process_mage_id(mage_ids)
             channel_to_string = get_vectorised_converter(chmap_mage["string"])
             channel_to_position = get_vectorised_converter(chmap_mage["position"])
+            channel_to_type = get_vectorised_converter(chmap_mage["type"])
 
             # remove below threshold hits
 
@@ -398,6 +410,8 @@ for file_name in args.input_files:
                 else:
                     array_cut = array_copy[eval(_cut_string, globs, array_copy)]
 
+                if len(array_cut) == 0:
+                    continue
 
                 # if the cut is not sum or 2d false then flatten (by channel)
                 if _cut_dict["is_sum"] is False and _cut_dict["is_2d"] is False:
@@ -432,6 +446,7 @@ for file_name in args.input_files:
 
                 # 2d histos
                 elif _cut_dict["is_2d"] is True:
+
                     _energy_1_array = (
                         ak.max(array_cut["energy"], axis=-1).to_numpy() * 1000
                     )
@@ -439,11 +454,14 @@ for file_name in args.input_files:
                         ak.min(array_cut["energy"], axis=-1).to_numpy() * 1000
                     )
 
-                    _mult_channel_array = array_cut["mage_id"].to_numpy()
+                    # sort it
+                    _mult_channel_array = array_cut["mage_id"][
+                        ak.argsort(array_cut["energy"], axis=-1)
+                    ].to_numpy()
 
                     # loop over categories
                     for name in names_m2:
-                        if name != "all":
+                        if name != "all" and "e1" not in name:
                             categories = get_m2_categories(
                                 _mult_channel_array,
                                 channel_to_string,
@@ -471,6 +489,13 @@ for file_name in args.input_files:
                                 _energy_1_array_tmp = np.array(_energy_1_array)[ids]
                                 _energy_2_array_tmp = np.array(_energy_2_array)[ids]
 
+                        # select by type
+                        elif "e1" in name:
+                            e1_mage_id = _mult_channel_array[:, 1]
+                            types = channel_to_type(e1_mage_id)
+                            ids = np.where(types == name.split("_")[1])
+                            _energy_1_array_tmp = np.array(_energy_1_array)[ids]
+                            _energy_2_array_tmp = np.array(_energy_2_array)[ids]
                         else:
                             _energy_1_array_tmp = np.array(_energy_1_array)
                             _energy_2_array_tmp = np.array(_energy_2_array)
