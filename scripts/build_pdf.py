@@ -360,6 +360,7 @@ for file_name in args.input_files:
         raise ValueError(msg)
 
     # now open the file
+
     with uproot.open(f"{file_name}:simTree", object_cache=None) as pytree:
         if pytree.num_entries == 0:
             msg = f"ERROR: MPP evt file {file_name} has 0 events in simTree"
