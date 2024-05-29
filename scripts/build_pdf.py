@@ -461,10 +461,10 @@ for file_name in args.input_files:
                             np.ones(len(_energy_array)),
                         )
 
-                # 2d histos
                 elif _cut_dict["is_2d"] is True and (
                     "lar_energy" not in _cut_dict or _cut_dict["lar_energy"] is False
                 ):
+
 
                     _energy_1_array = (
                         ak.max(array_cut["energy"], axis=-1).to_numpy() * 1000
