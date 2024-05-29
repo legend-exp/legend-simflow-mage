@@ -315,7 +315,10 @@ for _cut_name in rconfig["cuts"]:
     if rconfig["cuts"][_cut_name]["is_2d"] is True:
         hists_2d[_cut_name] = {}
 
-        if ("lar_energy" not in rconfig["cuts"][_cut_name] or rconfig["cuts"][_cut_name]["lar_energy"] is False):
+        if (
+            "lar_energy" not in rconfig["cuts"][_cut_name]
+            or rconfig["cuts"][_cut_name]["lar_energy"] is False
+        ):
             for cat in names_m2:
                 hists_2d[_cut_name][cat] = ROOT.TH2F(
                     f"{_cut_name}_{cat}_2d",
@@ -329,15 +332,15 @@ for _cut_name in rconfig["cuts"]:
                 )
         else:
             hists_2d[_cut_name]["all"] = ROOT.TH2F(
-                    f"{_cut_name}_all_2d",
-                    "energy deposits",
-                    rconfig["hist"]["nbins"],
-                    rconfig["hist"]["emin"],
-                    rconfig["hist"]["emax"],
-                    rconfig["hist"]["nbins"],
-                    rconfig["hist"]["emin"],
-                    rconfig["hist"]["emax"],
-                )
+                f"{_cut_name}_all_2d",
+                "energy deposits",
+                rconfig["hist"]["nbins"],
+                rconfig["hist"]["emin"],
+                rconfig["hist"]["emax"],
+                rconfig["hist"]["nbins"],
+                rconfig["hist"]["emin"],
+                rconfig["hist"]["emax"],
+            )
 
 for file_name in args.input_files:
     msg = f" >>> loading file {file_name}"
@@ -355,7 +358,7 @@ for file_name in args.input_files:
     else:
         msg = "filename doesn't contain run / period"
         raise ValueError(msg)
-      
+
     # now open the file
     with uproot.open(f"{file_name}:simTree", object_cache=None) as pytree:
         if pytree.num_entries == 0:
@@ -367,7 +370,6 @@ for file_name in args.input_files:
         for array in pytree.iterate(step_size="100 MB"):
 
             array_copy = ak.copy(array)
-        
 
             rng = np.random.default_rng()
             array_copy["npe_tot_poisson"] = rng.poisson(array_copy.npe_tot)
@@ -459,7 +461,9 @@ for file_name in args.input_files:
                         )
 
                 # 2d histos
-                elif _cut_dict["is_2d"] is True and ( "lar_energy" not in _cut_dict or _cut_dict["lar_energy"] is False):
+                elif _cut_dict["is_2d"] is True and (
+                    "lar_energy" not in _cut_dict or _cut_dict["lar_energy"] is False
+                ):
 
                     _energy_1_array = (
                         ak.max(array_cut["energy"], axis=-1).to_numpy() * 1000
@@ -525,18 +529,19 @@ for file_name in args.input_files:
 
                 # th2 of lar energy
                 elif _cut_dict["is_2d"] is True and _cut_dict["lar_energy"] is True:
-                    _energy_array = ak.sum(
-                        array_cut["energy"], axis=-1).to_numpy() * 1000
-                    _lar_energy_array = array_cut["edep_lar_MeV"].to_numpy()*1000
+                    _energy_array = (
+                        ak.sum(array_cut["energy"], axis=-1).to_numpy() * 1000
+                    )
+                    _lar_energy_array = array_cut["edep_lar_MeV"].to_numpy() * 1000
 
                     if len(_energy_array) == 0:
                         continue
                     hists_2d[_cut_name]["all"].FillN(
-                            len(_energy_array),
-                            _energy_array,
-                            _lar_energy_array,
-                            np.ones(len(_energy_array)),
-                        )
+                        len(_energy_array),
+                        _energy_array,
+                        _lar_energy_array,
+                        np.ones(len(_energy_array)),
+                    )
                 else:
                     _summed_energy_array = (
                         ak.sum(array_cut["energy"], axis=-1).to_numpy() * 1000
