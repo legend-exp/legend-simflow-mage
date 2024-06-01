@@ -300,7 +300,7 @@ string_diff = np.arange(7)
 floor_diff = np.arange(8)
 names_m2 = [f"sd_{item1}" for item1 in string_diff]
 names_m2.extend(["all", "cat_1", "cat_2", "cat_3"])
-names_m2.extend(["e1_icpc", "e1_bege", "e1_ppc", "e2_coax"])
+names_m2.extend(["e1_icpc", "e1_bege", "e1_ppc", "e1_coax"])
 
 for _cut_name in rconfig["cuts"]:
     if rconfig["cuts"][_cut_name]["is_sum"] is True:
