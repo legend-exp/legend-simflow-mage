@@ -129,7 +129,7 @@ def macro_gen_inputs(config, tier, simid, **kwargs):
 
 def input_simjob_filename(config, **kwargs):
     """Returns the full path to the input file for a `simid`, `tier` and job index."""
-    tier = kwargs.get("tier", None)
+    tier = kwargs.get("tier")
 
     if tier is None:
         msg = "the 'tier' argument is mandatory"
@@ -142,7 +142,7 @@ def input_simjob_filename(config, **kwargs):
 
 def output_simjob_filename(config, **kwargs):
     """Returns the full path to the output file for a `simid`, `tier` and job index."""
-    tier = kwargs.get("tier", None)
+    tier = kwargs.get("tier")
 
     if tier is None:
         msg = "the 'tier' argument is mandatory"
@@ -156,7 +156,7 @@ def output_simjob_filename(config, **kwargs):
 
 
 def output_simjob_regex(config, **kwargs):
-    tier = kwargs.get("tier", None)
+    tier = kwargs.get("tier")
 
     if tier is None:
         msg = "the 'tier' argument is mandatory"
