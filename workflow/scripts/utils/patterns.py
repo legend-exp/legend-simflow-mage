@@ -38,14 +38,14 @@ FILETYPES = AttrsDict(
     {
         "input": {
             "ver": ".mac",
-            "raw": ".mac",
+            "stp": ".mac",
             "hit": ".lh5",
             "evt": ".lh5",
             "pdf": ".lh5",
         },
         "output": {
             "ver": ".lh5",
-            "raw": ".lh5",
+            "stp": ".lh5",
             "hit": ".lh5",
             "evt": ".lh5",
             "pdf": ".lh5",
@@ -124,7 +124,7 @@ def template_macro_dir(config, **kwargs):
     return Path(config["paths"]["config"]) / "tier" / tier / config["experiment"]
 
 
-# ver, raw, hit tiers
+# ver, stp, hit tiers
 
 
 def macro_gen_inputs(config, tier, simid, **kwargs):
@@ -201,10 +201,10 @@ def output_simid_filenames(config, n_macros, **kwargs):
     return expand(pat, jobid=jobids, **kwargs, allow_missing=True)
 
 
-def smk_ver_filename_for_raw(config, wildcards):
-    """Returns the vertices file needed for the 'raw' tier job, if needed. Used
-    as lambda function in the `build_tier_raw` Snakemake rule."""
-    tdir = template_macro_dir(config, tier="raw")
+def smk_ver_filename_for_stp(config, wildcards):
+    """Returns the vertices file needed for the 'stp' tier job, if needed. Used
+    as lambda function in the `build_tier_stp` Snakemake rule."""
+    tdir = template_macro_dir(config, tier="stp")
 
     with (tdir / "simconfig.json").open() as f:
         sconfig = json.load(f)[wildcards.simid]

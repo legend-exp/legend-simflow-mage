@@ -31,7 +31,7 @@ printline("-----", "----------------", "---------", "---------------------")
 bdir = Path(patterns.as_ro(snakemake.config, snakemake.config["paths"]["benchmarks"]))
 
 for simd in sorted(bdir.glob("*/*")):
-    if simd.parent.name not in ("ver", "raw"):
+    if simd.parent.name not in ("ver", "stp"):
         continue
 
     data = {"cpu_time": 0}

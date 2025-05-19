@@ -47,7 +47,7 @@ for simd in sorted(bdir.glob("*/*")):
     if njobs == 0:
         continue
 
-    tier = simd.parent.name if simd.parent.name in ("ver", "raw") else "raw"
+    tier = simd.parent.name if simd.parent.name in ("ver", "stp") else "stp"
 
     tdir = patterns.template_macro_dir(snakemake.config, tier=tier)
     with (tdir / "simconfig.json").open() as f:

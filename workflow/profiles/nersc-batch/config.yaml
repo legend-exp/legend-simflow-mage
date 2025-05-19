@@ -37,7 +37,7 @@ default-resources:
 # number of threads used by each rule
 set-threads:
   - build_tier_ver=1
-  - build_tier_raw=1
+  - build_tier_stp=1
 
 # we define groups in order to let Snakemake group rule instances in the same
 # SLURM job. relevant docs:
@@ -45,7 +45,7 @@ set-threads:
 # - https://snakemake.readthedocs.io/en/stable/executing/grouping.html#job-grouping
 groups:
   - build_tier_ver=sims
-  - build_tier_raw=sims
+  - build_tier_stp=sims
 
 # disconnected parts of the workflow can run in parallel (at most 256 of them)
 # in a group

@@ -9,7 +9,7 @@ shadow-prefix: /tmp
 # number of threads used by each rule
 set-threads:
   - build_tier_ver=1
-  - build_tier_raw=1
+  - build_tier_stp=1
 
 # memory and runtime requirements for each single rule
 # - https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#resources
@@ -17,5 +17,5 @@ set-threads:
 set-resources:
   - build_tier_ver:mem_mb=1000
   - build_tier_ver:runtime=120
-  - build_tier_raw:mem_mb=1000
-  - build_tier_raw:runtime=120
+  - build_tier_stp:mem_mb=1000
+  - build_tier_stp:runtime=120
