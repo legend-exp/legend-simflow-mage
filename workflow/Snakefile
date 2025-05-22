@@ -33,6 +33,19 @@ wildcard_constraints:
     runid=r"[-\w]+",
 
 
+onstart:
+    print("INFO: starting workflow")
+
+    # Make sure some packages are initialized before we begin to avoid race conditions
+    # https://numba.readthedocs.io/en/stable/developer/caching.html#cache-sharing
+    # FIXME: do this automatically
+    if not workflow.touch:
+        shell(
+            execenv.execenv_pyexe(config, "python")
+            + "-c 'import lgdo, matplotlib, pygama, reboost'"
+        )
+
+
 if "stp" in make_tiers:
     rule gen_all_macros:
         """Aggregate and produce all the macro files."""

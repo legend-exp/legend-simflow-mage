@@ -1,6 +1,7 @@
 *.swp
 *.swo
 workflow/src/legendsimflow/_version.py
+.snakemake
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

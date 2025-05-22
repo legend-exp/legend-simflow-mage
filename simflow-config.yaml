@@ -43,7 +43,7 @@ paths:
   pdf_releases: $_/generated/releases
   plots: $_/generated/plots
 
-  install: $_/.snakemake/legend-dataflow/venv
+  install: /global/common/software/legend/lgsim/prodenv/v2.0.0a1/inner-venv
 
 execenv:
   bare:
@@ -52,11 +52,24 @@ execenv:
       HDF5_USE_FILE_LOCKING: "false"
       TQDM_DISABLE: "true"
 
-  nersc:
-    cmd: podman
-    arg: run legendexp/remage:latest
+  nersc-podman:
+    cmd: podman-hpc run
+    arg:
+      - --entrypoint=
+      -  --volume=/global/common/software/legend:/global/common/software/legend
+      - --volume=$_:$_
+      - --workdir=$_
+      - docker.io/legendexp/remage:dev
     env:
-      NUMBA_CACHE_DIR: $_/.snakemake/legend-dataflow/venv/cache
+      NUMBA_CACHE_DIR: /global/common/software/legend/lgsim/prodenv/v2.0.0a1/inner-venv/cache
+      HDF5_USE_FILE_LOCKING: "false"
+      TQDM_DISABLE: "true"
+
+  nersc:
+    cmd: shifter
+    arg: --image legendexp/remage:dev
+    env:
+      NUMBA_CACHE_DIR: /global/common/software/legend/lgsim/prodenv/v2.0.0a1/inner-venv/cache
       HDF5_USE_FILE_LOCKING: "false"
       TQDM_DISABLE: "true"
 
