@@ -16,6 +16,8 @@ simlist: all
 make_tiers:
 - stp
 
+legend_metadata_version: main
+
 benchmark:
   enabled: false
   n_primaries:
@@ -43,16 +45,24 @@ paths:
   pdf_releases: $_/generated/releases
   plots: $_/generated/plots
 
-  install: /global/common/software/legend/lgsim/prodenv/v2.0.0a1/inner-venv
+precompile_pkg:
+  - lgdo
+  - matplotlib
+  - reboost
+  - legendhpges
+  - legendoptics
+  - pygeomtools
 
 execenv:
   bare:
+    install: $_/.snakemake/legend-dataflow/venv
     env:
       NUMBA_CACHE_DIR: $_/.snakemake/legend-dataflow/venv/cache
       HDF5_USE_FILE_LOCKING: "false"
       TQDM_DISABLE: "true"
 
   nersc-podman:
+    init: podman-hpc pull docker.io/legendexp/remage:dev
     cmd: podman-hpc run
     arg:
       - --entrypoint=
@@ -60,14 +70,17 @@ execenv:
       - --volume=$_:$_
       - --workdir=$_
       - docker.io/legendexp/remage:dev
+    install: /global/common/software/legend/lgsim/prodenv/v2.0.0a1/inner-venv
     env:
       NUMBA_CACHE_DIR: /global/common/software/legend/lgsim/prodenv/v2.0.0a1/inner-venv/cache
       HDF5_USE_FILE_LOCKING: "false"
       TQDM_DISABLE: "true"
 
   nersc:
+    init: shifterimg pull legendexp/remage:dev
     cmd: shifter
     arg: --image legendexp/remage:dev
+    install: /global/common/software/legend/lgsim/prodenv/v2.0.0a1/inner-venv
     env:
       NUMBA_CACHE_DIR: /global/common/software/legend/lgsim/prodenv/v2.0.0a1/inner-venv/cache
       HDF5_USE_FILE_LOCKING: "false"

@@ -15,16 +15,25 @@
 
 from pathlib import Path
 
-from scripts.utils import utils, patterns, aggregate, tier_evt
+from dbetto import AttrsDict
+
+from legenddataflowscripts.workflow import execenv, utils
+from legendsimflow import patterns, aggregate, tier_evt
+from legendmeta import LegendMetadata
+
 
 if not config:
     raise RuntimeError("you must set a config file with --configfile")
 
-utils.subst_vars_in_snakemake_config(workflow, config)
-
 config.setdefault("benchmark", {"enabled": False})
 make_tiers = config.get("make_tiers", ["ver", "stp", "hit", "evt", "pdf"])
 
+config = AttrsDict(utils.subst_vars_in_snakemake_config(workflow, config))
+
+# NOTE: this will attempt a clone of legend-metadata, if the directory does not exist
+metadata = LegendMetadata(config.paths.metadata)
+if "legend_metadata_version" in config:
+    metadata.checkout(config.legend_metadata_version)
 
 wildcard_constraints:
     tier=r"\w+",
@@ -38,11 +47,10 @@ onstart:
 
     # Make sure some packages are initialized before we begin to avoid race conditions
     # https://numba.readthedocs.io/en/stable/developer/caching.html#cache-sharing
-    # FIXME: do this automatically
     if not workflow.touch:
         shell(
-            execenv.execenv_pyexe(config, "python")
-            + "-c 'import lgdo, matplotlib, pygama, reboost'"
+            f"{execenv.execenv_pyexe(config, 'python')} "
+            f"-c '{", ".join(config.precompile_pkg)}'"
         )
 
 
@@ -52,7 +60,6 @@ if "stp" in make_tiers:
         input:
             aggregate.gen_list_of_all_macros(config, tier="ver"),
             aggregate.gen_list_of_all_macros(config, tier="stp"),
-
 
     rule gen_all_tier_stp:
         """Aggregate and produce all the stp tier files."""
@@ -80,7 +87,6 @@ if "pdf" in make_tiers:
         """Aggregate and produce all the pdf tier files."""
         input:
             aggregate.gen_list_of_all_tier_pdf_outputs(config),
-
 
     rule gen_pdf_release:
         """Generates a tarball with all the pdf files."""
