@@ -27,10 +27,9 @@ Definitions:
 """
 from __future__ import annotations
 
-import json
-import re
 from pathlib import Path
 
+import yaml
 from dbetto import AttrsDict
 from snakemake.io import expand
 
@@ -52,20 +51,6 @@ FILETYPES = AttrsDict(
         },
     }
 )
-
-
-def as_ro(config, path):
-    if "read_only_fs_sub_pattern" not in config:
-        return path
-
-    sub_pattern = config["read_only_fs_sub_pattern"]
-
-    if isinstance(path, str):
-        return re.sub(*sub_pattern, path)
-    if isinstance(path, Path):
-        return Path(re.sub(*sub_pattern, path.name))
-
-    return [as_ro(config, p) for p in path]
 
 
 def simjob_rel_basename(**kwargs):
@@ -131,16 +116,16 @@ def macro_gen_inputs(config, tier, simid, **kwargs):
     """Return inputs for the Snakemake rules that generate macros."""
     tdir = template_macro_dir(config, tier=tier)
 
-    with (tdir / "simconfig.json").open() as f:
-        sconfig = json.load(f)[simid]
+    with (tdir / "simconfig.yaml").open() as f:
+        sconfig = yaml.safe_load(f)[simid]
 
     if "template" not in sconfig:
-        msg = "simconfig.json blocks must define a 'template' field."
+        msg = "simconfig.yaml blocks must define a 'template' field."
         raise RuntimeError(msg)
 
     expr = {
         "template": str(tdir / sconfig["template"]),
-        "cfgfile": str(tdir / "simconfig.json"),
+        "cfgfile": str(tdir / "simconfig.yaml"),
     }
     for k, v in expr.items():
         expr[k] = expand(v, **kwargs, allow_missing=True)[0]
@@ -206,8 +191,8 @@ def smk_ver_filename_for_stp(config, wildcards):
     as lambda function in the `build_tier_stp` Snakemake rule."""
     tdir = template_macro_dir(config, tier="stp")
 
-    with (tdir / "simconfig.json").open() as f:
-        sconfig = json.load(f)[wildcards.simid]
+    with (tdir / "simconfig.yaml").open() as f:
+        sconfig = yaml.safe_load(f)[wildcards.simid]
 
     if "vertices" in sconfig:
         return output_simjob_filename(config, tier="ver", simid=sconfig["vertices"])
@@ -250,7 +235,7 @@ def pdffile_rel_basename(**kwargs):
 
 
 def pdf_config_path(config):
-    return template_macro_dir(config, tier="pdf") / "build-pdf-config.json"
+    return template_macro_dir(config, tier="pdf") / "build-pdf-config.yaml"
 
 
 def output_pdf_filename(config, **kwargs):
