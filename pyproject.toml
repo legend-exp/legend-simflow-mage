@@ -53,6 +53,7 @@ dependencies = [
     "pylegendmeta",
     "pip",
     "legend-dataflow-scripts >=0.1.2",
+    "pyyaml",
 ]
 
 [project.optional-dependencies]
