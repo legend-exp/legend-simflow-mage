@@ -17,7 +17,8 @@ from pathlib import Path
 
 from dbetto import AttrsDict
 
-from legenddataflowscripts.workflow import execenv, utils
+# from legenddataflowscripts.workflow import execenv, utils
+import utils
 from legendsimflow import patterns, aggregate, tier_evt
 from legendmeta import LegendMetadata
 
@@ -27,13 +28,15 @@ if not config:
 
 config.setdefault("benchmark", {"enabled": False})
 make_tiers = config.get("make_tiers", ["ver", "stp", "hit", "evt", "pdf"])
+utils.subst_vars_in_snakemake_config(workflow, config)
 
-config = AttrsDict(utils.subst_vars_in_snakemake_config(workflow, config))
+config = AttrsDict(config)
 
 # NOTE: this will attempt a clone of legend-metadata, if the directory does not exist
 metadata = LegendMetadata(config.paths.metadata)
 if "legend_metadata_version" in config:
     metadata.checkout(config.legend_metadata_version)
+
 
 wildcard_constraints:
     tier=r"\w+",
@@ -55,6 +58,7 @@ onstart:
 
 
 if "stp" in make_tiers:
+
     rule gen_all_macros:
         """Aggregate and produce all the macro files."""
         input:
@@ -69,6 +73,7 @@ if "stp" in make_tiers:
 
 
 if "hit" in make_tiers:
+
     rule gen_all_tier_hit:
         """Aggregate and produce all the hit tier files."""
         input:
@@ -76,36 +81,43 @@ if "hit" in make_tiers:
 
 
 if "evt" in make_tiers:
+
     rule gen_all_tier_evt:
         """Aggregate and produce all the evt tier files."""
         input:
             aggregate.gen_list_of_all_tier_evt_outputs(config),
 
 
-if "pdf" in make_tiers:
-    rule gen_all_tier_pdf:
-        """Aggregate and produce all the pdf tier files."""
-        input:
-            aggregate.gen_list_of_all_tier_pdf_outputs(config),
+# if "pdf" in make_tiers:
 
-    rule gen_pdf_release:
-        """Generates a tarball with all the pdf files."""
-        message:
-            "Generating pdf release"
-        input:
-            aggregate.gen_list_of_all_tier_pdf_outputs(config),
-        output:
-            Path(config["paths"]["pdf_releases"]) / (config["experiment"] + "-pdfs.tar.xz"),
-        params:
-            exp=config["experiment"],
-            ro_input=lambda wildcards, input: patterns.as_ro(config, input),
-        shell:
-            r"""
-            tar --create --xz \
-                --file {output} \
-                --transform 's|.*/\({params.exp}-.*-tier_pdf\..*\)|{params.exp}-pdfs/\1|g' \
-                {params.ro_input}
-            """
+
+rule gen_all_tier_pdf:
+    """Aggregate and produce all the pdf tier files."""
+    input:
+        aggregate.gen_list_of_all_tier_pdf_outputs(config),
+
+
+print(aggregate.gen_list_of_all_tier_pdf_outputs(config))
+
+
+rule gen_pdf_release:
+    """Generates a tarball with all the pdf files."""
+    message:
+        "Generating pdf release"
+    input:
+        aggregate.gen_list_of_all_tier_pdf_outputs(config),
+    output:
+        Path(config["paths"]["pdf_releases"]) / (config["experiment"] + "-pdfs.tar.xz"),
+    params:
+        exp=config["experiment"],
+        ro_input=lambda wildcards, input: utils.as_ro(config, input),
+    shell:
+        r"""
+        tar --create --xz \
+            --file {output} \
+            --transform 's|.*/\({params.exp}-.*-tier_pdf\..*\)|{params.exp}-pdfs/\1|g' \
+            {params.ro_input}
+        """
 
 
 def gen_target_all():
@@ -120,7 +132,7 @@ def gen_target_all():
             return (
                 rules.gen_all_tier_stp.output,
                 aggregate.gen_list_of_all_plots_outputs(config, tier="stp"),
-                aggregate.gen_list_of_all_plots_outputs(config, tier="ver")
+                aggregate.gen_list_of_all_plots_outputs(config, tier="ver"),
             )
     else:
         return aggregate.process_simlist(config)
@@ -136,11 +148,11 @@ rule all:
 # must be deduced at runtime from the JSON configuration, we need here to
 # generate a separate rule for each 'simid'
 simconfigs = aggregate.collect_simconfigs(config, ["ver", "stp"])
-
 for tier, simid, n_macros in simconfigs:
     if tier in make_tiers:
+
         rule:
-            f"""Generates all needed simulation macros ({n_macros}) for {simid} in tier {tier}. No wildcards are used."""
+            """Generates all needed simulation macros. No wildcards are used."""  # ({n_macros}) for {simid} in tier {tier}"""
             localrule: True
             input:
                 **patterns.macro_gen_inputs(config, tier, simid),
@@ -159,6 +171,7 @@ for tier, simid, n_macros in simconfigs:
 
 
 if "stp" in make_tiers:
+
     rule build_tier_ver:
         """Run a single simulation job for the ver tier.
         Uses wildcards `simid` and `jobid`.
@@ -184,7 +197,6 @@ if "stp" in make_tiers:
         shell:
             patterns.run_command(config, "ver")
 
-
     rule build_tier_stp:
         """Run a single simulation job for the stp tier.
         Uses wildcards `simid` and `jobid`.
@@ -201,7 +213,9 @@ if "stp" in make_tiers:
             "Producing output file for job stp.{wildcards.simid}.{wildcards.jobid}"
         input:
             macro=ancient(patterns.input_simjob_filename(config, tier="stp")),
-            verfile=lambda wildcards: patterns.smk_ver_filename_for_stp(config, wildcards),
+            verfile=lambda wildcards: patterns.smk_ver_filename_for_stp(
+                config, wildcards
+            ),
         output:
             protected(patterns.output_simjob_filename(config, tier="stp")),
         log:
@@ -213,6 +227,7 @@ if "stp" in make_tiers:
 
 
 if "hit" in make_tiers:
+
     rule build_tier_hit:
         """Produces a hit tier file starting from a single stp tier file."""
         message:
@@ -225,7 +240,7 @@ if "hit" in make_tiers:
         output:
             patterns.output_simjob_filename(config, tier="hit"),
         params:
-            ro_stp_file=lambda wildcards, input: patterns.as_ro(config, input.stp_file),
+            ro_stp_file=lambda wildcards, input: utils.as_ro(config, input.stp_file),
         log:
             patterns.log_file_path(config, tier="hit"),
         benchmark:
@@ -235,6 +250,7 @@ if "hit" in make_tiers:
 
 
 if "evt" in make_tiers:
+
     rule make_tier_evt_config_file:
         """Generates configuration files for `build_tier_evt` based on metadata.
         Uses wildcard `runid`."""
@@ -246,7 +262,6 @@ if "evt" in make_tiers:
             Path(config["paths"]["genconfig"]) / "{runid}-build_evt.json",
         script:
             "scripts/make_tier_evt_config_file.py"
-
 
     rule make_run_partition_file:
         """Computes and stores on disk rules for partitioning the simulated event
@@ -260,10 +275,9 @@ if "evt" in make_tiers:
         output:
             Path(config["paths"]["genconfig"]) / "{simid}-run_partition.json",
         params:
-            ro_hit_files=lambda wildcards, input: patterns.as_ro(config, input.hit_files),
+            ro_hit_files=lambda wildcards, input: utils.as_ro(config, input.hit_files),
         script:
             "scripts/make_run_partition_file.py"
-
 
     rule build_tier_evt:
         """Produces an evt tier file."""
@@ -283,7 +297,9 @@ if "evt" in make_tiers:
             evt_window=lambda wildcards, input: tier_evt.smk_get_evt_window(
                 wildcards, input
             ),
-            hit_files_regex=patterns.as_ro(config, patterns.output_simjob_regex(config, tier="hit")),
+            hit_files_regex=utils.as_ro(
+                config, patterns.output_simjob_regex(config, tier="hit")
+            ),
         log:
             patterns.log_evtfile_path(config),
         benchmark:
@@ -293,6 +309,7 @@ if "evt" in make_tiers:
 
 
 if "pdf" in make_tiers:
+
     rule build_tier_pdf:
         """Produces a pdf tier file."""
         message:
@@ -305,8 +322,10 @@ if "pdf" in make_tiers:
         output:
             patterns.output_pdf_filename(config),
         params:
-            stp_files_regex=patterns.as_ro(config, patterns.output_simjob_regex(config, tier="stp")),
-            ro_evt_files=lambda wildcards, input: patterns.as_ro(config, input.evt_files),
+            stp_files_regex=utils.as_ro(
+                config, patterns.output_simjob_regex(config, tier="stp")
+            ),
+            ro_evt_files=lambda wildcards, input: utils.as_ro(config, input.evt_files),
         log:
             patterns.log_pdffile_path(config),
         benchmark:

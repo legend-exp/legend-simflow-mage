@@ -18,7 +18,7 @@ for tier, simid, _ in simconfigs:
     if tier in make_tiers:
 
         rule:
-            f"""Produces plots for the primary event vertices of simid {simid} in tier {tier}"""
+            """Produces plots for the primary event vertices of simid {simid} in tier {tier}"""
             input:
                 aggregate.gen_list_of_simid_outputs(config, tier, simid, max_files=5),
             output:
@@ -58,6 +58,6 @@ if any([t in make_tiers for t in ("ver", "stp")]):
         """Reports any warning from the simulation job logs."""
         localrule: True
         params:
-            logdir=patterns.as_ro(config, config["paths"]["log"]),
+            logdir=utils.as_ro(config, config["paths"]["log"]),
         script:
             "../scripts/inspect_MaGe_logs.sh"
